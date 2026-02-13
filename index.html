@@ -129,6 +129,14 @@
     );
 
     const App = () => {
+      // Configuration - must be defined before useState that references it
+      const CONFIG = {
+        geminiKey: "", // API key removed for security - configure in Google Sheets
+        oddsKey: "", // API key removed for security - configure in Google Sheets
+        sheetId: "", // Your Google Sheet ID - will be fetched from Web App
+        webAppUrl: localStorage.getItem('abis_webapp_url') || ""
+      };
+
       const [activeTab, setActiveTab] = useState('dashboard');
       const [initialCapital, setInitialCapital] = useState("");
       const [currentBankroll, setCurrentBankroll] = useState(0);
@@ -141,14 +149,6 @@
       const [isSyncing, setIsSyncing] = useState(false);
       const [webAppUrl, setWebAppUrl] = useState(CONFIG.webAppUrl);
       const [lastSyncTime, setLastSyncTime] = useState(null);
-
-      const CONFIG = {
-        geminiKey: "", // API key removed for security - configure in Google Sheets
-        oddsKey: "", // API key removed for security - configure in Google Sheets
-        sheetId: "", // Your Google Sheet ID - will be fetched from Web App
-        // This will be your Google Apps Script Web App URL after deployment
-        webAppUrl: localStorage.getItem('abis_webapp_url') || ""
-      };
 
       // Load data from localStorage on mount
       useEffect(() => {
