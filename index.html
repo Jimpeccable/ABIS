@@ -137,11 +137,17 @@
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [placedBets, setPlacedBets] = useState([]);
       const [settledBets, setSettledBets] = useState([]);
+      const [isConnected, setIsConnected] = useState(false);
+      const [isSyncing, setIsSyncing] = useState(false);
+      const [webAppUrl, setWebAppUrl] = useState(CONFIG.webAppUrl);
+      const [lastSyncTime, setLastSyncTime] = useState(null);
 
       const CONFIG = {
-        geminiKey: "AIzaSyAbPdVSto0JMUr7AkEDCd8j3MeTTjTVlJI",
-        oddsKey: "0d7491630a8624fe87ea1da0dad2ea3f",
-        sheetId: "1seugfTs11E634y9_ILFwlZ0YxJmkO6mlJro6wTmnoaE"
+        geminiKey: "", // API key removed for security - configure in Google Sheets
+        oddsKey: "", // API key removed for security - configure in Google Sheets
+        sheetId: "", // Your Google Sheet ID - will be fetched from Web App
+        // This will be your Google Apps Script Web App URL after deployment
+        webAppUrl: localStorage.getItem('abis_webapp_url') || ""
       };
 
       // Load data from localStorage on mount
@@ -149,11 +155,107 @@
         const savedBankroll = localStorage.getItem('abis_bankroll');
         const savedPlacedBets = localStorage.getItem('abis_placed_bets');
         const savedSettledBets = localStorage.getItem('abis_settled_bets');
+        const savedWebAppUrl = localStorage.getItem('abis_webapp_url');
         
         if (savedBankroll) setCurrentBankroll(parseFloat(savedBankroll));
         if (savedPlacedBets) setPlacedBets(JSON.parse(savedPlacedBets));
         if (savedSettledBets) setSettledBets(JSON.parse(savedSettledBets));
+        if (savedWebAppUrl) {
+          setWebAppUrl(savedWebAppUrl);
+          testConnection(savedWebAppUrl);
+        }
       }, []);
+
+      // Test connection to Google Sheets
+      const testConnection = async (url) => {
+        if (!url) {
+          setIsConnected(false);
+          return;
+        }
+        
+        try {
+          const response = await fetch(url + '?action=test', {
+            method: 'GET',
+            mode: 'cors'
+          });
+          const data = await response.json();
+          setIsConnected(data.status === 'ok');
+          if (data.status === 'ok') {
+            console.log('✅ Connected to Google Sheets');
+          }
+        } catch (error) {
+          console.error('❌ Connection failed:', error);
+          setIsConnected(false);
+        }
+      };
+
+      // Sync data to Google Sheets
+      const syncToSheets = async () => {
+        if (!webAppUrl || !isConnected) {
+          alert('Please connect to Google Sheets first!');
+          return;
+        }
+
+        setIsSyncing(true);
+        
+        try {
+          // Push placed bets
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'syncPlacedBets',
+              data: placedBets
+            })
+          });
+
+          // Push settled bets
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'syncSettledBets',
+              data: settledBets
+            })
+          });
+
+          // Update P/L trends
+          const stats = calculateStats();
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'updatePL',
+              data: {
+                date: new Date().toISOString(),
+                balance: currentBankroll,
+                netProfit: stats.netProfit,
+                winRate: stats.winRate,
+                totalBets: stats.totalBets
+              }
+            })
+          });
+
+          setLastSyncTime(new Date());
+          alert('✅ Data synced to Google Sheets successfully!');
+        } catch (error) {
+          console.error('Sync error:', error);
+          alert('❌ Sync failed. Check console for details.');
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      // Save Web App URL
+      const saveWebAppUrl = (url) => {
+        setWebAppUrl(url);
+        localStorage.setItem('abis_webapp_url', url);
+        CONFIG.webAppUrl = url;
+        testConnection(url);
+      };
 
       // Save to localStorage whenever data changes
       useEffect(() => {
@@ -393,14 +495,20 @@
       };
 
       const generateScript = () => `/**
- * ABIS UK LIVE PRODUCTION ENGINE - v2.0
- * Enhanced with bet tracking and multi-league support
+ * ABIS UK LIVE PRODUCTION ENGINE - v2.5
+ * Complete Web App with REST API endpoints for website sync
+ * 
+ * SECURITY NOTE: Your API keys are stored here in Google Apps Script,
+ * which is private and not exposed in your public website code.
  */
 
-const GEMINI_API_KEY = "${CONFIG.geminiKey}";
-const ODDS_API_KEY = "${CONFIG.oddsKey}";
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
+const ODDS_API_KEY = "YOUR_ODDS_API_KEY_HERE";
 const START_BAL = ${currentBankroll};
-const MANUAL_SHEET_ID = "${CONFIG.sheetId}";
+const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
+
+// Copy the complete script from: google-apps-script-webapp.js
+// The rest of the code remains the same...
 
 function getActiveSheet() {
   if (MANUAL_SHEET_ID !== "") {
@@ -408,7 +516,7 @@ function getActiveSheet() {
   }
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
-    throw new Error("No active spreadsheet. Open script via Extensions > Apps Script inside your Sheet.");
+    throw new Error("No active spreadsheet found.");
   }
   return ss;
 }
@@ -419,88 +527,17 @@ function onOpen() {
       .createMenu('🚀 ABIS System')
       .addItem('Initialize Environment', 'initialSetup')
       .addSeparator()
-      .addItem('Sync Market Data', 'runAnalysis')
-      .addItem('Update Placed Bets', 'syncPlacedBets')
+      .addItem('View Placed Bets', 'viewPlacedBets')
+      .addItem('View P/L Summary', 'viewPLSummary')
       .addToUi();
   } catch (e) {
     Logger.log('UI Menu error: ' + e.message);
   }
 }
 
-function initialSetup() {
-  const ss = getActiveSheet();
-  const tabs = {
-    'Config': [
-      ['Key', 'Value'],
-      ['GEMINI_KEY', GEMINI_API_KEY],
-      ['ODDS_KEY', ODDS_API_KEY],
-      ['START_BAL', START_BAL]
-    ],
-    'Recommendations': [
-      ['Type', 'Event', 'League', 'Selection', 'Bookie', 'Odds', 'Confidence', 'Strategy']
-    ],
-    'Placed_Bets': [
-      ['ID', 'Event', 'League', 'Selection', 'Stake', 'Odds', 'Potential_Return', 'Placed_Date', 'Status']
-    ],
-    'P_L_Trends': [
-      ['Date', 'Balance', 'Net_Profit', 'Win_Rate']
-    ]
-  };
-  
-  Object.keys(tabs).forEach(tabName => {
-    let sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-    sheet.clear();
-    sheet.getRange(1, 1, tabs[tabName].length, tabs[tabName][0].length)
-         .setValues(tabs[tabName]);
-    Logger.log('Provisioned: ' + tabName);
-  });
-
-  Logger.log('✅ ABIS ENGINE INITIALIZATION COMPLETE');
-  
-  try {
-    SpreadsheetApp.getUi().alert('✅ PROVISIONING SUCCESSFUL\\n\\nAll sheets configured. Gemini bridge active.');
-  } catch(e) {
-    Logger.log('Alert skipped in headless mode');
-  }
-}
-
-function syncPlacedBets() {
-  const ss = getActiveSheet();
-  const sheet = ss.getSheetByName('Placed_Bets');
-  
-  // This would sync with your frontend app data
-  // For now, it logs the current placed bets
-  Logger.log('Syncing placed bets...');
-  
-  const lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
-    Logger.log('Found ' + (lastRow - 1) + ' placed bets');
-  } else {
-    Logger.log('No placed bets found');
-  }
-}
-
-function runAnalysis() {
-  const ss = getActiveSheet();
-  Logger.log('🔄 Syncing with Odds API & Gemini Intelligence...');
-  
-  // Fetch live odds from API
-  const oddsUrl = 'https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey=' + ODDS_API_KEY + '&regions=uk&markets=h2h';
-  
-  try {
-    const response = UrlFetchApp.fetch(oddsUrl);
-    const data = JSON.parse(response.getContentText());
-    Logger.log('✅ Fetched ' + data.length + ' live matches');
-    
-    // Process and store recommendations
-    const recsSheet = ss.getSheetByName('Recommendations');
-    // Add your processing logic here
-    
-  } catch(e) {
-    Logger.log('❌ API Error: ' + e.message);
-  }
-}`;
+// NOTE: For the complete script with all functions (doGet, doPost, sync functions),
+// download the google-apps-script-webapp.js file and replace the placeholder values above.
+`;
 
       const copyToClipboard = () => {
         const el = document.createElement('textarea');
@@ -742,6 +779,14 @@ function runAnalysis() {
             <button className="lg:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               {isMobileMenuOpen ? <X /> : <Menu />}
             </button>
+
+            {/* Connection Status Indicator */}
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-xs font-bold text-slate-400">
+                {isConnected ? 'Sheets Connected' : 'Not Connected'}
+              </span>
+            </div>
           </nav>
 
           {/* Mobile Menu */}
@@ -898,6 +943,45 @@ function runAnalysis() {
                   <p className="text-slate-400 text-lg font-medium">Deploying the ABIS Backend to your Google Sheets environment.</p>
                 </header>
 
+                {/* Connection Status Card */}
+                <div className={`mb-12 p-6 rounded-3xl border-2 ${isConnected ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-amber-500/5 border-amber-500/30'}`}>
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-xl ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+                      <Database size={24} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-black text-white mb-2">
+                        {isConnected ? '✅ Google Sheets Connected' : '⚠️ Connect to Google Sheets'}
+                      </h3>
+                      <p className="text-sm text-slate-400 mb-4">
+                        {isConnected 
+                          ? `Connected and ready to sync. ${lastSyncTime ? `Last sync: ${lastSyncTime.toLocaleTimeString()}` : 'No syncs yet.'}`
+                          : 'Complete the setup below to enable real-time data synchronization.'
+                        }
+                      </p>
+                      {isConnected && (
+                        <button
+                          onClick={syncToSheets}
+                          disabled={isSyncing}
+                          className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all"
+                        >
+                          {isSyncing ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              SYNCING...
+                            </>
+                          ) : (
+                            <>
+                              <Database size={16} />
+                              SYNC NOW
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid gap-12">
                   <section className="relative pl-16">
                     <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">1</div>
@@ -911,9 +995,33 @@ function runAnalysis() {
                   <section className="relative pl-16">
                     <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">2</div>
                     <h3 className="text-xl font-bold text-white mb-2">Inject Logic Layer</h3>
-                    <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                      Copy the generated script below. Your API keys and starting bankroll of <b>£{currentBankroll}</b> are automatically integrated.
+                    <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+                      Download the complete script file below. Your API keys will be stored <b>securely in Google Apps Script</b> (private server-side), 
+                      not in your public website code.
                     </p>
+                    
+                    <div className="mb-6 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-amber-600 p-2 rounded-xl shrink-0">
+                          <Shield className="text-white" size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-amber-400 mb-2 uppercase">Security Instructions</h4>
+                          <ol className="text-xs text-slate-300 space-y-2 leading-relaxed">
+                            <li><b>1.</b> Download the <code className="bg-slate-950 px-2 py-1 rounded text-blue-400">google-apps-script-webapp.js</code> file</li>
+                            <li><b>2.</b> Open it and replace the placeholder values:
+                              <ul className="ml-4 mt-1 space-y-1">
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_GEMINI_API_KEY_HERE</code></li>
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_ODDS_API_KEY_HERE</code></li>
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_GOOGLE_SHEET_ID_HERE</code></li>
+                              </ul>
+                            </li>
+                            <li><b>3.</b> Copy the entire script into Google Apps Script</li>
+                            <li><b>4.</b> Your keys stay private in Google's servers, never exposed in GitHub</li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
                     
                     <div className="relative group rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
                       <div className="absolute right-6 top-6 z-10">
@@ -944,6 +1052,41 @@ function runAnalysis() {
                         This builds the Config, Recommendations, Placed_Bets, and P&L history tabs automatically.
                       </p>
                     </div>
+                  </section>
+
+                  <section className="relative pl-16">
+                    <div className="absolute left-0 top-0 w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">4</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Deploy Web App & Connect</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                      In Apps Script, click <b>Deploy → New deployment → Select type: Web app</b>. 
+                      Set "Who has access" to <b>"Anyone"</b>, then click <b>Deploy</b>. 
+                      Copy the Web App URL and paste it below.
+                    </p>
+                    
+                    <div className="flex gap-3 mb-4">
+                      <input
+                        type="text"
+                        placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={webAppUrl}
+                        onChange={(e) => setWebAppUrl(e.target.value)}
+                      />
+                      <button
+                        onClick={() => saveWebAppUrl(webAppUrl)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black text-sm transition-all"
+                      >
+                        CONNECT
+                      </button>
+                    </div>
+
+                    {isConnected && (
+                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                        <CheckCircle2 className="text-emerald-500" size={20} />
+                        <span className="text-sm font-bold text-emerald-400">
+                          Connected! Your website and Google Sheets are now synced.
+                        </span>
+                      </div>
+                    )}
                   </section>
                 </div>
               </div>
