@@ -272,170 +272,61 @@
         localStorage.setItem('abis_settled_bets', JSON.stringify(settledBets));
       }, [settledBets]);
 
-      // Enhanced opportunities with diverse bet types and score predictions
-      const opportunities = [
-        {
-          id: 1,
-          type: 'Value Bet',
-          event: 'Arsenal vs Man City',
-          league: 'Premier League',
-          bookie: 'Bet365',
-          url: 'https://www.bet365.com',
-          odds: 2.85,
-          confidence: 88,
-          customerType: 'Existing Customers',
-          reasoning: "Historical H2H: Arsenal won 3 of last 5 at home. Market overreaction to City's injury list (KDB, Haaland out). Stats show Arsenal averaging 2.1 xG at Emirates this season vs top 6.",
-          strategy: 'Diversification Recommended: Add 2 more bets from the list.',
-          selection: 'Arsenal to Win',
-          additionalBets: [
-            { selection: 'Correct Score 2-1', odds: 9.50, confidence: 82, reasoning: "Arsenal's most common winning scoreline at home (28% of wins). City's defensive frailties without Stones." },
-            { selection: 'Over 2.5 Goals', odds: 1.85, confidence: 84, reasoning: "Last 6 H2H averaged 3.2 goals. Both teams' defensive issues suggest open game." }
-          ]
-        },
-        {
-          id: 2,
-          type: 'Matched Bet',
-          event: 'Liverpool vs Everton',
-          league: 'Premier League',
-          bookie: 'SkyBet',
-          url: 'https://www.skybet.com',
-          laySite: 'Smarkets (Exchange)',
-          layUrl: 'https://smarkets.com',
-          odds: 2.1,
-          layOdds: 2.14,
-          confidence: 99,
-          customerType: 'New Customers Only',
-          offerDetails: 'Bet £10 Get £30 in Free Bets (Sign-up Offer)',
-          reasoning: "Extremely low qualifying loss (£0.40). Exchange liquidity confirmed at £50k+. Historical data shows 94% success rate on Merseyside Derby over 1.5 goals.",
-          strategy: 'High Priority: Focus on this before value bets.',
-          selection: 'Over 1.5 Goals',
-          additionalBets: [
-            { selection: 'BTTS (Both Teams To Score)', odds: 2.20, confidence: 81, reasoning: "Derby intensity drives goals. Last 8 meetings: BTTS in 7. Everton desperate for points." }
-          ]
-        },
-        {
-          id: 3,
-          type: 'Value Bet',
-          event: 'Real Madrid vs Barcelona',
-          league: 'La Liga',
-          bookie: 'William Hill',
-          url: 'https://www.williamhill.com',
-          odds: 3.20,
-          confidence: 85,
-          customerType: 'Existing Customers',
-          reasoning: "El Clásico at Bernabéu. Madrid's home form: 8W-1D-0L. Barcelona's away record vs top 4: 2W-2D-3L. xG differential suggests 12% value vs market odds. Recent 3 meetings averaged 3.7 goals.",
-          strategy: 'Single stake recommended due to variance.',
-          selection: 'Real Madrid to Win',
-          additionalBets: [
-            { selection: 'Correct Score 3-2', odds: 18.00, confidence: 80, reasoning: "Most frequent Clásico scoreline historically. Attacking firepower on both sides." },
-            { selection: 'Over 3.5 Goals', odds: 2.40, confidence: 83, reasoning: "Recent Clásicos: 4-0, 3-1, 2-3, 1-2. Averaging 3.7 goals. Both defenses vulnerable." },
-            { selection: 'Vinícius Anytime Scorer', odds: 2.10, confidence: 86, reasoning: "Scored in last 4 Clásicos. 12 goals in 9 home games this season." }
-          ]
-        },
-        {
-          id: 4,
-          type: 'Value Bet',
-          event: 'Newcastle vs Brighton',
-          league: 'Premier League',
-          bookie: 'Betfair',
-          url: 'https://www.betfair.com',
-          odds: 2.45,
-          confidence: 82,
-          customerType: 'Existing Customers',
-          reasoning: "Newcastle home dominance: 85% win rate vs mid-table teams. Brighton injury crisis (3 key defenders out). Stats: Newcastle averaging 1.8 xG at home, Brighton conceding 1.6 xGA away.",
-          strategy: 'Combine with under 3.5 goals for insurance.',
-          selection: 'Newcastle to Win',
-          additionalBets: [
-            { selection: 'Under 3.5 Goals', odds: 1.65, confidence: 81, reasoning: "Newcastle's defensive solidity. 73% of their home wins under 3 goals total." },
-            { selection: 'Correct Score 2-0', odds: 8.00, confidence: 80, reasoning: "Newcastle's most common home winning scoreline (5 times this season)." }
-          ]
-        },
-        {
-          id: 5,
-          type: 'Value Bet',
-          event: 'Leeds vs Burnley',
-          league: 'Championship',
-          bookie: 'Paddy Power',
-          url: 'https://www.paddypower.com',
-          odds: 1.95,
-          confidence: 81,
-          customerType: 'Existing Customers',
-          reasoning: "Championship analytics: Leeds 2.3 xG per game at Elland Road. Burnley's away form: 4L in last 6. Head-to-head: Leeds won 4 of last 5 meetings by 2+ goals.",
-          strategy: 'Stake 1.5x normal for high-probability outcome.',
-          selection: 'Leeds -1 Handicap',
-          additionalBets: [
-            { selection: 'Leeds to Win & Over 2.5', odds: 2.30, confidence: 82, reasoning: "Leeds score 2.8 goals per game at home. Burnley concede 1.9 away. Combo locks value." }
-          ]
-        },
-        {
-          id: 6,
-          type: 'Value Bet',
-          event: 'Bolton vs Derby',
-          league: 'League One',
-          bookie: 'Coral',
-          url: 'https://www.coral.co.uk',
-          odds: 2.10,
-          confidence: 80,
-          customerType: 'Existing Customers',
-          reasoning: "League One stats: Bolton home win rate 71%. Derby missing top scorer (6 goals in 8 games). Bolton's pressing metrics rank #1 in division. Expected goals model shows 65% win probability.",
-          strategy: 'Low-risk single recommended.',
-          selection: 'Bolton to Win'
-        },
-        {
-          id: 7,
-          type: 'Value Bet',
-          event: 'Atlético Madrid vs Sevilla',
-          league: 'La Liga',
-          bookie: 'Bet365',
-          url: 'https://www.bet365.com',
-          odds: 1.72,
-          confidence: 84,
-          customerType: 'Existing Customers',
-          reasoning: "Atlético's fortress: 11W-2D-0L at Wanda Metropolitano. Sevilla's crisis: 1W in last 7 away. Simeone's defensive system limits opposition to 0.8 xG at home.",
-          strategy: 'High-confidence banker bet.',
-          selection: 'Atlético to Win',
-          additionalBets: [
-            { selection: 'Under 2.5 Goals', odds: 1.90, confidence: 87, reasoning: "Simeone ball. 76% of Atlético home games under 2.5. Sevilla averaging 0.9 goals away." },
-            { selection: 'Correct Score 1-0', odds: 6.50, confidence: 81, reasoning: "Atlético's signature scoreline. 42% of home wins are 1-0." }
-          ]
-        },
-        {
-          id: 8,
-          type: 'Value Bet',
-          event: 'Sheffield United vs Middlesbrough',
-          league: 'Championship',
-          bookie: 'William Hill',
-          url: 'https://www.williamhill.com',
-          odds: 2.05,
-          confidence: 80,
-          customerType: 'Existing Customers',
-          reasoning: "Sheffield United's promotion push: 6W-1D-1L at home. Boro's travel sickness: 2W-3D-5L away. Steel City advantage worth 0.4 xG per game historically.",
-          strategy: 'Combine with BTTS for safety net.',
-          selection: 'Sheffield United to Win',
-          additionalBets: [
-            { selection: 'BTTS Yes', odds: 1.95, confidence: 82, reasoning: "Both teams score in 68% of Championship fixtures. Attacking quality on both sides." }
-          ]
-        },
-        {
-          id: 9,
-          type: 'Value Bet',
-          event: 'Manchester United vs Chelsea',
-          league: 'Premier League',
-          bookie: 'Betfair',
-          url: 'https://www.betfair.com',
-          odds: 2.60,
-          confidence: 81,
-          customerType: 'Existing Customers',
-          reasoning: "United's resurgence under new tactics: 4W in last 5 at Old Trafford. Chelsea's defensive vulnerabilities exposed in last 3 away games (8 goals conceded).",
-          strategy: 'Back goals in high-intensity fixture.',
-          selection: 'Over 2.5 Goals',
-          additionalBets: [
-            { selection: 'BTTS & Over 2.5', odds: 2.40, confidence: 83, reasoning: "Last 5 H2H: all had 3+ goals and BTTS. Defensive frailties on both sides." },
-            { selection: 'Correct Score 2-2', odds: 14.00, confidence: 80, reasoning: "Draw specialists recently. 2-2 occurred 3 times in last 8 meetings." }
-          ]
-        }
-      ];
+      // State for live opportunities
+      const [opportunities, setOpportunities] = useState([]);
+      const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
+      const [lastDataFetch, setLastDataFetch] = useState(null);
 
+      // Fetch live opportunities from The Odds API via Google Sheets Web App
+      const fetchLiveOpportunities = async () => {
+        if (!webAppUrl || !isConnected) {
+          console.log('Not connected to sheets - showing sample data');
+          return;
+        }
+
+        setIsLoadingOpportunities(true);
+        
+        try {
+          const response = await fetch(webAppUrl + '?action=getRecommendations', {
+            method: 'GET',
+            mode: 'cors'
+          });
+          
+          const data = await response.json();
+          
+          if (data.status === 'ok' && data.recommendations) {
+            setOpportunities(data.recommendations);
+            setLastDataFetch(new Date());
+            console.log('✅ Loaded', data.recommendations.length, 'live opportunities');
+          }
+        } catch (error) {
+          console.error('Failed to fetch opportunities:', error);
+        } finally {
+          setIsLoadingOpportunities(false);
+        }
+      };
+
+      // Auto-fetch on connection
+      useEffect(() => {
+        if (isConnected && webAppUrl) {
+          fetchLiveOpportunities();
+        }
+      }, [isConnected]);
+
+      // Helper to check if event is today
+      const isToday = (dateString) => {
+        const eventDate = new Date(dateString);
+        const today = new Date();
+        return eventDate.toDateString() === today.toDateString();
+      };
+
+      // Helper to check if event is within 2 days
+      const isWithin2Days = (dateString) => {
+        const eventDate = new Date(dateString);
+        const now = new Date();
+        const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+        return eventDate >= now && eventDate <= twoDaysFromNow;
+      };
       const handleSetBankroll = () => {
         const val = parseFloat(initialCapital);
         if (!isNaN(val) && val > 0) setCurrentBankroll(val);
@@ -811,26 +702,55 @@ function onOpen() {
                 <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
-                    <p className="text-slate-500 font-medium">Real-time UK & European Market Analysis</p>
+                    <p className="text-slate-500 font-medium">
+                      Real-time UK & European Market Analysis
+                      {lastDataFetch && (
+                        <span className="ml-2 text-xs">
+                          • Last updated: {lastDataFetch.toLocaleTimeString()}
+                        </span>
+                      )}
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-[2rem] border border-slate-800 shadow-2xl w-full lg:w-auto">
-                    <div className="flex items-center gap-3 px-4">
-                      <Wallet className="text-blue-400" size={20} />
-                      <input 
-                        type="number"
-                        placeholder="Enter Initial Bankroll"
-                        className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
-                        value={initialCapital}
-                        onChange={(e) => setInitialCapital(e.target.value)}
-                      />
+                  <div className="flex items-center gap-3">
+                    {isConnected && (
+                      <button
+                        onClick={fetchLiveOpportunities}
+                        disabled={isLoadingOpportunities}
+                        className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        {isLoadingOpportunities ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            LOADING...
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={16} className="fill-current" />
+                            REFRESH DATA
+                          </>
+                        )}
+                      </button>
+                    )}
+                    
+                    <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-[2rem] border border-slate-800 shadow-2xl">
+                      <div className="flex items-center gap-3 px-4">
+                        <Wallet className="text-blue-400" size={20} />
+                        <input 
+                          type="number"
+                          placeholder="Enter Initial Bankroll"
+                          className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
+                          value={initialCapital}
+                          onChange={(e) => setInitialCapital(e.target.value)}
+                        />
+                      </div>
+                      <button 
+                        onClick={handleSetBankroll}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-black transition-all active:scale-95"
+                      >
+                        INITIALIZE
+                      </button>
                     </div>
-                    <button 
-                      onClick={handleSetBankroll}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-black transition-all active:scale-95"
-                    >
-                      INITIALIZE
-                    </button>
                   </div>
                 </header>
 
@@ -922,14 +842,52 @@ function onOpen() {
 
                     <div className="mb-12">
                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
-                        <Zap className="text-amber-400 fill-amber-400" size={16} /> Live Recommendations
+                        <Zap className="text-amber-400 fill-amber-400" size={16} /> 
+                        Live Recommendations ({opportunities.filter(o => o.confidence >= 80).length})
                       </h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {opportunities
-                          .filter(opp => opp.confidence >= 80)
-                          .map(opp => <OpportunityCard key={opp.id} opp={opp} />)
-                        }
-                      </div>
+                      
+                      {isLoadingOpportunities ? (
+                        <div className="text-center py-20">
+                          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                          <p className="text-slate-400 font-bold">Fetching live opportunities...</p>
+                        </div>
+                      ) : opportunities.length === 0 ? (
+                        <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
+                            <Zap className="text-slate-600" size={32} />
+                          </div>
+                          <h3 className="text-2xl font-black text-white mb-2">No Live Opportunities</h3>
+                          <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                            {isConnected 
+                              ? 'Click "REFRESH DATA" to fetch the latest opportunities from The Odds API.' 
+                              : 'Connect to Google Sheets to load live betting recommendations.'}
+                          </p>
+                          {isConnected && (
+                            <button
+                              onClick={fetchLiveOpportunities}
+                              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                            >
+                              REFRESH DATA NOW
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          {opportunities
+                            .filter(opp => opp.confidence >= 80)
+                            .map(opp => (
+                              <div key={opp.id} className={opp.isToday ? 'ring-2 ring-amber-500 rounded-3xl' : ''}>
+                                {opp.isToday && (
+                                  <div className="bg-amber-500 text-slate-900 text-xs font-black px-4 py-2 rounded-t-3xl text-center uppercase tracking-wider">
+                                    ⚡ EVENT TODAY - {new Date(opp.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                  </div>
+                                )}
+                                <OpportunityCard opp={opp} />
+                              </div>
+                            ))
+                          }
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
