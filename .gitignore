@@ -1,0 +1,26 @@
+# ABIS Live - Git Ignore File
+# Prevents accidentally committing sensitive files
+
+# Environment variables and config files
+.env
+.env.local
+config.js
+secrets.js
+
+# API Keys (just in case)
+*api-key*
+*apikey*
+*secret*
+
+# Google Apps Script files with keys
+google-apps-script-with-keys.js
+
+# Local development
+.DS_Store
+*.log
+node_modules/
+
+# Backup files
+*.backup
+*.bak
+*~
