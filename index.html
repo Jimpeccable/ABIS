@@ -140,7 +140,7 @@
       const [activeTab, setActiveTab] = useState('dashboard');
       const [initialCapital, setInitialCapital] = useState("");
       const [currentBankroll, setCurrentBankroll] = useState(0);
-      const [userStakeInput, setUserStakeInput] = useState(10);
+      const [userStakeInput, setUserStakeInput] = useState(5);
       const [copySuccess, setCopySuccess] = useState(false);
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [placedBets, setPlacedBets] = useState([]);
@@ -412,11 +412,26 @@
           if (bet.id === betId) {
             const updatedPotentialReturn = (bet.stake * newOdds).toFixed(2);
             const updatedProfit = (updatedPotentialReturn - bet.stake).toFixed(2);
+            
+            // Recalculate confidence based on odds movement
+            const oddsChange = ((newOdds - bet.odds) / bet.odds) * 100;
+            let newConfidence = bet.confidence;
+            
+            if (oddsChange > 5) {
+              // Odds drifted (got longer) - confidence decreases
+              newConfidence = Math.max(70, bet.confidence - Math.floor(oddsChange / 2));
+            } else if (oddsChange < -5) {
+              // Odds shortened - confidence increases
+              newConfidence = Math.min(95, bet.confidence + Math.floor(Math.abs(oddsChange) / 2));
+            }
+            
             return {
               ...bet,
               odds: newOdds,
               potentialReturn: updatedPotentialReturn,
-              profit: updatedProfit
+              profit: updatedProfit,
+              confidence: newConfidence,
+              confidenceChange: newConfidence - bet.confidence
             };
           }
           return bet;
@@ -797,7 +812,7 @@ function onOpen() {
             
             {activeTab === 'dashboard' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+                <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
                     <p className="text-slate-500 font-medium">
@@ -810,60 +825,103 @@ function onOpen() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {isConnected && (
-                      <button
-                        onClick={fetchLiveOpportunities}
-                        disabled={isLoadingOpportunities}
-                        className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
-                      >
-                        {isLoadingOpportunities ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            LOADING...
-                          </>
-                        ) : (
-                          <>
-                            <Zap size={16} className="fill-current" />
-                            REFRESH DATA
-                          </>
-                        )}
-                      </button>
-                    )}
-                    
-                    <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-[2rem] border border-slate-800 shadow-2xl">
-                      <div className="flex items-center gap-3 px-4">
-                        <Wallet className="text-blue-400" size={20} />
-                        <input 
-                          type="number"
-                          placeholder="Enter Initial Bankroll"
-                          className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
-                          value={initialCapital}
-                          onChange={(e) => setInitialCapital(e.target.value)}
-                        />
-                      </div>
-                      <button 
-                        onClick={handleSetBankroll}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-black transition-all active:scale-95"
-                      >
-                        INITIALIZE
-                      </button>
-                    </div>
-                  </div>
+                  {isConnected && (
+                    <button
+                      onClick={fetchLiveOpportunities}
+                      disabled={isLoadingOpportunities}
+                      className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      {isLoadingOpportunities ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          LOADING...
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={16} className="fill-current" />
+                          REFRESH DATA
+                        </>
+                      )}
+                    </button>
+                  )}
                 </header>
+
+                {/* Gemini AI Active Indicator */}
+                {isConnected && opportunities.length > 0 && (
+                  <div className="mb-8 p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-2xl flex items-center gap-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                    <p className="text-sm font-bold text-purple-400">
+                      🤖 Gemini AI Active - All recommendations verified by AI analysis (not sample data)
+                    </p>
+                  </div>
+                )}
 
                 {currentBankroll === 0 ? (
                   <div className="py-32 flex flex-col items-center justify-center bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
                     <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6">
                       <Database className="text-slate-600" size={32} />
                     </div>
-                    <h3 className="text-2xl font-black text-white mb-2">Blank Slate</h3>
+                    <h3 className="text-2xl font-black text-white mb-2">Initialize Your Bankroll</h3>
                     <p className="text-slate-500 text-center max-w-sm px-8 font-medium">
-                      Initialize your bankroll above to unlock Profit/Loss trends and live betting recommendations.
+                      Go to <b>Provisioning</b> tab to set your starting capital and unlock live betting recommendations.
                     </p>
                   </div>
                 ) : (
                   <>
+                    {/* Top 3 Bets Today */}
+                    {(() => {
+                      const todayBets = opportunities
+                        .filter(opp => opp.confidence >= 80 && opp.isToday)
+                        .sort((a, b) => b.confidence - a.confidence)
+                        .slice(0, 3);
+                      
+                      if (todayBets.length > 0) {
+                        return (
+                          <div className="mb-12">
+                            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-2 border-amber-500/30 rounded-3xl p-8 mb-8">
+                              <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-amber-500 rounded-xl">
+                                  <TrendingUp size={24} className="text-white" />
+                                </div>
+                                <div>
+                                  <h3 className="text-2xl font-black text-white">Top 3 Bets Today</h3>
+                                  <p className="text-sm text-slate-400">Highest confidence opportunities kicking off today</p>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {todayBets.map((bet, idx) => (
+                                  <div key={bet.id} className="bg-slate-900 border border-slate-700 rounded-2xl p-6 relative">
+                                    <div className="absolute -top-3 -left-3 w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-slate-900 font-black text-sm">
+                                      #{idx + 1}
+                                    </div>
+                                    <div className="mb-3">
+                                      <span className="text-xs text-slate-500 uppercase font-bold">{bet.league}</span>
+                                      <h4 className="text-lg font-black text-white mt-1">{bet.event}</h4>
+                                      <p className="text-sm text-blue-400 font-bold mt-1">{bet.selection}</p>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                      <div>
+                                        <p className="text-xs text-slate-500 uppercase">Confidence</p>
+                                        <p className="text-2xl font-black text-emerald-400">{bet.confidence}%</p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-xs text-slate-500 uppercase">Odds</p>
+                                        <p className="text-xl font-bold text-white">{bet.odds}</p>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-3 italic">
+                                      {new Date(bet.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                       <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
                         <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Current Bankroll</p>
@@ -912,7 +970,7 @@ function onOpen() {
                               <div className="flex-1">
                                 <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
                                 <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
-                                <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
+                                <div className="flex gap-4 text-xs text-slate-400 flex-wrap items-center">
                                   <span>Stake: <b className="text-white">£{bet.stake}</b></span>
                                   <div className="flex items-center gap-2">
                                     <span>Odds:</span>
@@ -925,6 +983,18 @@ function onOpen() {
                                     />
                                   </div>
                                   <span>Return: <b className="text-emerald-400">£{bet.potentialReturn}</b></span>
+                                  {bet.confidenceChange && (
+                                    <div className={`flex items-center gap-1 px-2 py-1 rounded ${
+                                      bet.confidenceChange > 0 ? 'bg-emerald-500/10 text-emerald-400' : 
+                                      bet.confidenceChange < 0 ? 'bg-red-500/10 text-red-400' : 'bg-slate-800 text-slate-400'
+                                    }`}>
+                                      <span className="font-bold">
+                                        {bet.confidenceChange > 0 ? '↑' : '↓'} {Math.abs(bet.confidenceChange)}%
+                                      </span>
+                                      <span className="text-[10px]">confidence</span>
+                                    </div>
+                                  )}
+                                  <span>Confidence: <b className={bet.confidence >= 85 ? 'text-emerald-400' : 'text-white'}>{bet.confidence}%</b></span>
                                 </div>
                               </div>
                               <div className="flex gap-2">
@@ -980,8 +1050,8 @@ function onOpen() {
                         </div>
                       ) : (
                         <>
-                          {/* Group opportunities by league */}
-                          {['Premier League', 'La Liga', 'Championship', 'League One', 'League Two', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
+                          {/* Group opportunities by league - EXCLUDE La Liga (it has its own tab) */}
+                          {['Premier League', 'Championship', 'League One', 'League Two', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
                             const leagueOpps = opportunities
                               .filter(opp => opp.confidence >= 80 && opp.league === league)
                               .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
@@ -1062,6 +1132,42 @@ function onOpen() {
                             </>
                           )}
                         </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Initialize Bankroll Section */}
+                <div className="mb-12 p-6 bg-blue-500/5 border-2 border-blue-500/30 rounded-3xl">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-xl bg-blue-600">
+                      <Wallet size={24} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-black text-white mb-2">Initialize Bankroll</h3>
+                      <p className="text-sm text-slate-400 mb-4">Set your starting capital to begin tracking bets and P/L</p>
+                      <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-2xl border border-slate-800 w-fit">
+                        <div className="flex items-center gap-3 px-4">
+                          <span className="text-lg font-black text-slate-500">£</span>
+                          <input 
+                            type="number"
+                            placeholder="e.g. 100"
+                            className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
+                            value={initialCapital}
+                            onChange={(e) => setInitialCapital(e.target.value)}
+                          />
+                        </div>
+                        <button 
+                          onClick={handleSetBankroll}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-xs font-black transition-all active:scale-95"
+                        >
+                          INITIALIZE
+                        </button>
+                      </div>
+                      {currentBankroll > 0 && (
+                        <p className="text-xs text-emerald-400 font-bold mt-3">
+                          ✅ Current Bankroll: £{currentBankroll.toFixed(2)}
+                        </p>
                       )}
                     </div>
                   </div>
