@@ -825,78 +825,48 @@ function onOpen() {
                         )}
                       </button>
                     )}
-                    
-                    <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-[2rem] border border-slate-800 shadow-2xl">
-                      <div className="flex items-center gap-3 px-4">
-                        <Wallet className="text-blue-400" size={20} />
-                        <input 
-                          type="number"
-                          placeholder="Enter Initial Bankroll"
-                          className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
-                          value={initialCapital}
-                          onChange={(e) => setInitialCapital(e.target.value)}
-                        />
-                      </div>
-                      <button 
-                        onClick={handleSetBankroll}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-black transition-all active:scale-95"
-                      >
-                        INITIALIZE
-                      </button>
-                    </div>
                   </div>
                 </header>
 
-                {currentBankroll === 0 ? (
-                  <div className="py-32 flex flex-col items-center justify-center bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6">
-                      <Database className="text-slate-600" size={32} />
-                    </div>
-                    <h3 className="text-2xl font-black text-white mb-2">Blank Slate</h3>
-                    <p className="text-slate-500 text-center max-w-sm px-8 font-medium">
-                      Initialize your bankroll above to unlock Profit/Loss trends and live betting recommendations.
-                    </p>
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Current Bankroll</p>
+                    <h4 className="text-3xl font-black text-white">£{currentBankroll.toFixed(2)}</h4>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
-                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Current Bankroll</p>
-                        <h4 className="text-3xl font-black text-white">£{currentBankroll.toFixed(2)}</h4>
-                      </div>
-                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
-                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Total P/L</p>
-                        <h4 className={`text-3xl font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          £{stats.netProfit.toFixed(2)}
-                        </h4>
-                      </div>
-                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
-                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Win Rate</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <TrendingUp className="text-emerald-500" size={16} />
-                          <span className="text-2xl font-bold text-white">{stats.winRate}%</span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">{stats.wonBets}/{stats.totalBets} wins</p>
-                      </div>
-                      <div className="bg-slate-900 p-8 rounded-[2rem] border-2 border-blue-500/30 shadow-2xl bg-gradient-to-br from-slate-900 to-blue-900/10">
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Default Stake</p>
-                          <Calculator size={14} className="text-blue-400" />
-                        </div>
-                        <div className="flex items-center">
-                          <span className="text-2xl font-black text-slate-500 mr-1">£</span>
-                          <input 
-                            type="number"
-                            className="bg-transparent text-3xl font-black text-white w-full focus:outline-none"
-                            value={userStakeInput}
-                            onChange={(e) => setUserStakeInput(parseFloat(e.target.value) || 10)}
-                          />
-                        </div>
-                      </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Total P/L</p>
+                    <h4 className={`text-3xl font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      £{stats.netProfit.toFixed(2)}
+                    </h4>
+                  </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Win Rate</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <TrendingUp className="text-emerald-500" size={16} />
+                      <span className="text-2xl font-bold text-white">{stats.winRate}%</span>
                     </div>
+                    <p className="text-xs text-slate-500 mt-1">{stats.wonBets}/{stats.totalBets} wins</p>
+                  </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border-2 border-blue-500/30 shadow-2xl bg-gradient-to-br from-slate-900 to-blue-900/10">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Default Stake</p>
+                      <Calculator size={14} className="text-blue-400" />
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-2xl font-black text-slate-500 mr-1">£</span>
+                      <input 
+                        type="number"
+                        className="bg-transparent text-3xl font-black text-white w-full focus:outline-none"
+                        value={userStakeInput}
+                        onChange={(e) => setUserStakeInput(parseFloat(e.target.value) || 10)}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Pending Bets Section */}
-                    {placedBets.length > 0 && (
+                {/* Pending Bets Section */}
+                {placedBets.length > 0 && (
                       <div className="mb-12">
                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
                           <CheckSquare size={16} className="text-amber-400" /> Pending Bets ({placedBets.length})
@@ -1168,6 +1138,46 @@ function onOpen() {
                       </div>
                     )}
                   </section>
+
+                  {isConnected && (
+                    <section className="relative pl-16 mt-8">
+                      <div className="absolute left-0 top-0 w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">5</div>
+                      <h3 className="text-xl font-bold text-white mb-2">Initialize Your Bankroll</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        Set your initial betting bankroll to enable P/L tracking across all your bets.
+                      </p>
+                      
+                      <div className="flex gap-3 mb-4">
+                        <div className="flex-1 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                          <div className="flex items-center gap-3 px-4">
+                            <Wallet className="text-blue-400" size={20} />
+                            <input 
+                              type="number"
+                              placeholder="Enter Initial Bankroll (e.g., 1000)"
+                              className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-full placeholder:text-slate-700"
+                              value={initialCapital}
+                              onChange={(e) => setInitialCapital(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <button 
+                          onClick={handleSetBankroll}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black text-sm transition-all"
+                        >
+                          SET BANKROLL
+                        </button>
+                      </div>
+
+                      {currentBankroll > 0 && (
+                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                          <CheckCircle2 className="text-emerald-500" size={20} />
+                          <span className="text-sm font-bold text-emerald-400">
+                            Bankroll set to £{currentBankroll.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </section>
+                  )}
                 </div>
               </div>
             )}
