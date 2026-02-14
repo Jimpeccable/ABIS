@@ -766,7 +766,7 @@ function onOpen() {
             <div className="hidden lg:flex items-center gap-2">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-                { id: 'laliga', label: 'La Liga', icon: TrendingUp },
+                { id: 'laliga', label: 'RM & Barça', icon: TrendingUp },
                 { id: 'setup', label: 'Provisioning', icon: Database },
                 { id: 'history', label: 'Bet History', icon: History }
               ].map(tab => (
@@ -802,7 +802,7 @@ function onOpen() {
                   onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
                   className={`w-full p-4 rounded-2xl text-left font-bold capitalize ${activeTab === id ? 'bg-blue-600' : 'bg-slate-900'}`}
                 >
-                  {id === 'setup' ? 'Provisioning' : id}
+                  {id === 'setup' ? 'Provisioning' : id === 'laliga' ? 'RM & Barça' : id}
                 </button>
               ))}
             </div>
@@ -1359,8 +1359,8 @@ function onOpen() {
               <div className="animate-in fade-in duration-700">
                 <header className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">La Liga</h2>
-                    <p className="text-slate-500 font-medium">All upcoming La Liga matches in the next 7 days with live odds comparison</p>
+                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
+                    <p className="text-slate-500 font-medium">AI-powered score predictions for upcoming matches</p>
                   </div>
                   {isConnected && (
                     <button
@@ -1374,7 +1374,7 @@ function onOpen() {
                 </header>
 
                 {/* Real Madrid & Barcelona Score Predictions */}
-                {laLigaMatches.filter(m => m.isBigGame).length > 0 && (
+                {laLigaMatches.length > 0 && (
                   <div className="mb-12">
                     <div className="bg-gradient-to-r from-red-500/20 via-blue-500/20 to-amber-500/20 border-2 border-red-500/40 rounded-3xl p-8">
                       <div className="flex items-center gap-3 mb-6">
@@ -1486,9 +1486,9 @@ function onOpen() {
                 {isLoadingLaLiga ? (
                   <div className="text-center py-20">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">Fetching La Liga matches...</p>
+                    <p className="text-slate-400 font-bold">Fetching predictions...</p>
                   </div>
-                ) : laLigaMatches.length === 0 ? (
+                ) : laLigaMatches.length === 0 && (
                   <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
                     <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
                       <TrendingUp className="text-slate-600" size={32} />
@@ -1496,8 +1496,8 @@ function onOpen() {
                     <h3 className="text-2xl font-black text-white mb-2">No Upcoming Matches</h3>
                     <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
                       {isConnected 
-                        ? 'No La Liga matches scheduled in the next 7 days.' 
-                        : 'Connect to Google Sheets to load La Liga match data.'}
+                        ? 'No Real Madrid or Barcelona matches in the next 7 days.' 
+                        : 'Connect to Google Sheets to load predictions.'}
                     </p>
                     {isConnected && (
                       <button
@@ -1507,61 +1507,6 @@ function onOpen() {
                         REFRESH NOW
                       </button>
                     )}
-                  </div>
-                ) : (
-                  <div className="grid gap-8">
-                    {laLigaMatches.map(match => (
-                      <div key={match.id} className={`bg-slate-900 border rounded-3xl p-8 ${
-                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 
-                        match.isBigGame ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 
-                        'border-slate-800'
-                      }`}>
-                        {match.isElClasico && (
-                          <div className="bg-red-500 text-white text-sm font-black px-6 py-3 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
-                            ⚽ EL CLÁSICO - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </div>
-                        )}
-                        {!match.isElClasico && match.isBigGame && (
-                          <div className="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
-                            ⭐ Featured Match - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </div>
-                        )}
-                        
-                        <h3 className="text-2xl font-black text-white mb-6">{match.event}</h3>
-                        {!match.isElClasico && (
-                          <p className="text-sm text-slate-400 mb-6">
-                            {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </p>
-                        )}
-                        
-                        <div className="grid gap-4">
-                          {match.odds.map((bookmaker, idx) => (
-                            <div key={idx} className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-                              <div className="flex justify-between items-center mb-4">
-                                <h4 className="text-lg font-bold text-white">{bookmaker.bookie}</h4>
-                                <a href={bookmaker.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
-                                  Visit Site <ArrowUpRight size={12}/>
-                                </a>
-                              </div>
-                              <div className="grid grid-cols-3 gap-4">
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.home_team}</p>
-                                  <p className="text-2xl font-black text-emerald-400">{bookmaker.homeOdds.toFixed(2)}</p>
-                                </div>
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">Draw</p>
-                                  <p className="text-2xl font-black text-blue-400">{bookmaker.drawOdds.toFixed(2)}</p>
-                                </div>
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.away_team}</p>
-                                  <p className="text-2xl font-black text-amber-400">{bookmaker.awayOdds.toFixed(2)}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
