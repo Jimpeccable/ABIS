@@ -945,7 +945,7 @@ function onOpen() {
                     <div className="mb-12">
                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
                         <Zap className="text-amber-400 fill-amber-400" size={16} /> 
-                        Live Recommendations ({opportunities.filter(o => o.confidence >= 80).length})
+                        Live Recommendations ({opportunities.length})
                       </h3>
                       
                       {isLoadingOpportunities ? (
@@ -978,7 +978,7 @@ function onOpen() {
                           {/* Group opportunities by league */}
                           {['Premier League', 'La Liga', 'Championship', 'League One', 'League Two', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
                             const leagueOpps = opportunities
-                              .filter(opp => opp.confidence >= 80 && opp.league === league)
+                              .filter(opp => opp.league === league)
                               .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
                             
                             if (leagueOpps.length === 0) return null;
@@ -1240,8 +1240,8 @@ function onOpen() {
               <div className="animate-in fade-in duration-700">
                 <header className="flex justify-between items-center mb-12">
                   <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">La Liga</h2>
-                    <p className="text-slate-500 font-medium">All upcoming La Liga matches in the next 7 days with live odds comparison</p>
+                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
+                    <p className="text-slate-500 font-medium">Upcoming RM & Barça matches with AI predictions and confidence ratings</p>
                   </div>
                   {isConnected && (
                     <button
@@ -1257,7 +1257,7 @@ function onOpen() {
                 {isLoadingLaLiga ? (
                   <div className="text-center py-20">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">Fetching La Liga matches...</p>
+                    <p className="text-slate-400 font-bold">Fetching matches...</p>
                   </div>
                 ) : laLigaMatches.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
@@ -1267,8 +1267,8 @@ function onOpen() {
                     <h3 className="text-2xl font-black text-white mb-2">No Upcoming Matches</h3>
                     <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
                       {isConnected 
-                        ? 'No La Liga matches scheduled in the next 7 days.' 
-                        : 'Connect to Google Sheets to load La Liga match data.'}
+                        ? 'No Real Madrid or Barcelona matches scheduled in the next 7 days.' 
+                        : 'Connect to Google Sheets to load match data.'}
                     </p>
                     {isConnected && (
                       <button
@@ -1283,54 +1283,55 @@ function onOpen() {
                   <div className="grid gap-8">
                     {laLigaMatches.map(match => (
                       <div key={match.id} className={`bg-slate-900 border rounded-3xl p-8 ${
-                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 
-                        match.isBigGame ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 
-                        'border-slate-800'
+                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 'border-blue-500/50'
                       }`}>
                         {match.isElClasico && (
-                          <div className="bg-red-500 text-white text-sm font-black px-6 py-3 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
-                            ⚽ EL CLÁSICO - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </div>
-                        )}
-                        {!match.isElClasico && match.isBigGame && (
-                          <div className="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
-                            ⭐ Featured Match - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          <div className="bg-gradient-to-r from-red-600 to-blue-600 text-white text-sm font-black px-6 py-3 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
+                            ⚽ EL CLÁSICO ⚽
                           </div>
                         )}
                         
-                        <h3 className="text-2xl font-black text-white mb-6">{match.event}</h3>
-                        {!match.isElClasico && (
-                          <p className="text-sm text-slate-400 mb-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-2xl font-black text-white">{match.event}</h3>
+                          <span className="text-sm text-slate-400">
                             {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          </p>
-                        )}
-                        
-                        <div className="grid gap-4">
-                          {match.odds.map((bookmaker, idx) => (
-                            <div key={idx} className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-                              <div className="flex justify-between items-center mb-4">
-                                <h4 className="text-lg font-bold text-white">{bookmaker.bookie}</h4>
-                                <a href={bookmaker.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
-                                  Visit Site <ArrowUpRight size={12}/>
-                                </a>
-                              </div>
-                              <div className="grid grid-cols-3 gap-4">
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.home_team}</p>
-                                  <p className="text-2xl font-black text-emerald-400">{bookmaker.homeOdds.toFixed(2)}</p>
-                                </div>
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">Draw</p>
-                                  <p className="text-2xl font-black text-blue-400">{bookmaker.drawOdds.toFixed(2)}</p>
-                                </div>
-                                <div className="text-center p-4 bg-slate-900 rounded-xl">
-                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.away_team}</p>
-                                  <p className="text-2xl font-black text-amber-400">{bookmaker.awayOdds.toFixed(2)}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                          </span>
                         </div>
+                        
+                        {/* Prediction Section */}
+                        <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30 rounded-2xl p-6 mb-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="bg-blue-500 p-2 rounded-lg">
+                              <TrendingUp size={20} className="text-white" />
+                            </div>
+                            <h4 className="text-lg font-black text-white">AI PREDICTION</h4>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Predicted Score</p>
+                              <p className="text-3xl font-black text-emerald-400">{match.predictedScore || '?-?'}</p>
+                            </div>
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Confidence</p>
+                              <p className="text-3xl font-black text-blue-400">{match.scoreConfidence || 0}%</p>
+                            </div>
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Best Odds</p>
+                              <p className="text-3xl font-black text-amber-400">
+                                {match.odds && match.odds.length > 0 ? match.odds[0].homeOdds.toFixed(2) : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Analysis */}
+                        {match.reasoning && (
+                          <div className="bg-slate-950/50 rounded-2xl p-6">
+                            <p className="text-xs text-slate-500 uppercase font-black mb-2">Analysis</p>
+                            <p className="text-sm text-slate-300 leading-relaxed">{match.reasoning}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
