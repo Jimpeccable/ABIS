@@ -507,6 +507,9 @@
                         <p className="text-slate-400">With bookmakers: {fetchDebug.withBookmakers ?? '—'}</p>
                         <p className="text-slate-400">Sent to Gemini: {fetchDebug.geminiCalled ?? '—'}</p>
                         <p className="text-slate-400">Approved (≥70%): {fetchDebug.geminiApproved ?? '—'}</p>
+                        {(fetchDebug.geminiErrors && fetchDebug.geminiErrors.length > 0) && (
+                          <p className="text-amber-400 mt-2 font-bold">First Gemini failure: {fetchDebug.geminiErrors[0]}</p>
+                        )}
                         {(fetchDebug.errors && fetchDebug.errors.length > 0) && (
                           <p className="text-red-400 mt-2">Errors: {fetchDebug.errors.join('; ')}</p>
                         )}
@@ -520,27 +523,49 @@
                         FETCH LIVE DATA
                       </button>
                       {webAppUrl && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              const d = await jsonp(webAppUrl, { action: 'diagnostics' });
-                              if (d.status === 'ok') {
-                                const msg = `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`;
-                                alert(msg);
-                              } else {
-                                const msg = (d.message || '').toLowerCase().includes('unknown action')
-                                  ? 'CHECK ODDS API needs a newer Web App.\n\nRedeploy: In Google Apps Script open Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy. Then try again.'
-                                  : 'Diagnostics error: ' + (d.message || 'unknown');
-                                alert(msg);
+                        <>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const d = await jsonp(webAppUrl, { action: 'diagnostics' });
+                                if (d.status === 'ok') {
+                                  const msg = `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`;
+                                  alert(msg);
+                                } else {
+                                  const msg = (d.message || '').toLowerCase().includes('unknown action')
+                                    ? 'CHECK ODDS API needs a newer Web App.\n\nRedeploy: In Google Apps Script open Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy. Then try again.'
+                                    : 'Diagnostics error: ' + (d.message || 'unknown');
+                                  alert(msg);
+                                }
+                              } catch (e) {
+                                alert('Diagnostics failed: ' + e.message);
                               }
-                            } catch (e) {
-                              alert('Diagnostics failed: ' + e.message);
-                            }
-                          }}
-                          className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
-                        >
-                          CHECK ODDS API
-                        </button>
+                            }}
+                            className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
+                          >
+                            CHECK ODDS API
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const d = await jsonp(webAppUrl, { action: 'testGemini' });
+                                if (d.status === 'ok') {
+                                  const msg = d.httpCode !== 200
+                                    ? `Gemini: ${d.error || 'HTTP ' + d.httpCode}`
+                                    : `Gemini: HTTP ${d.httpCode}\nHas candidates: ${d.hasCandidates}\nHas text: ${d.hasText}\nParse OK: ${d.parseOk}\n${d.blockReason ? 'Block reason: ' + d.blockReason : ''}\n${d.rawSnippet ? 'Snippet: ' + d.rawSnippet : ''}`;
+                                  alert(msg);
+                                } else {
+                                  alert('Gemini test error: ' + (d.error || d.message || 'unknown'));
+                                }
+                              } catch (e) {
+                                alert('Test failed: ' + e.message);
+                              }
+                            }}
+                            className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
+                          >
+                            TEST GEMINI
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
