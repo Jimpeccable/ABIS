@@ -506,7 +506,7 @@
                         <p className="text-slate-400">In 2-day window: {fetchDebug.inWindow ?? '—'}</p>
                         <p className="text-slate-400">With bookmakers: {fetchDebug.withBookmakers ?? '—'}</p>
                         <p className="text-slate-400">Sent to Gemini: {fetchDebug.geminiCalled ?? '—'}</p>
-                        <p className="text-slate-400">Approved (≥75%): {fetchDebug.geminiApproved ?? '—'}</p>
+                        <p className="text-slate-400">Approved (≥70%): {fetchDebug.geminiApproved ?? '—'}</p>
                         {(fetchDebug.errors && fetchDebug.errors.length > 0) && (
                           <p className="text-red-400 mt-2">Errors: {fetchDebug.errors.join('; ')}</p>
                         )}
@@ -524,10 +524,15 @@
                           onClick={async () => {
                             try {
                               const d = await jsonp(webAppUrl, { action: 'diagnostics' });
-                              const msg = d.status === 'ok'
-                                ? `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`
-                                : 'Diagnostics error: ' + (d.message || 'unknown');
-                              alert(msg);
+                              if (d.status === 'ok') {
+                                const msg = `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`;
+                                alert(msg);
+                              } else {
+                                const msg = (d.message || '').toLowerCase().includes('unknown action')
+                                  ? 'CHECK ODDS API needs a newer Web App.\n\nRedeploy: In Google Apps Script open Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy. Then try again.'
+                                  : 'Diagnostics error: ' + (d.message || 'unknown');
+                                alert(msg);
+                              }
                             } catch (e) {
                               alert('Diagnostics failed: ' + e.message);
                             }
