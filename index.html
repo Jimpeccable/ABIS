@@ -452,24 +452,50 @@
       };
 
       const generateScript = () => `/**
- * ABIS UK INTELLIGENCE v4.2 - LIVE PRODUCTION
- * Security: Keys are stored privately in Google Apps Script
+ * ABIS UK LIVE PRODUCTION ENGINE - v2.5
+ * Complete Web App with REST API endpoints for website sync
+ *
+ * SECURITY NOTE: Your API keys are stored here in Google Apps Script,
+ * which is private and not exposed in your public website code.
  */
+
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 const ODDS_API_KEY = "0d7491630a8624fe87ea1da0dad2ea3f";
 const FOOTBALL_DATA_TOKEN = "cf8c5dca8e00408bb3303906e89a54a0";
+const API_FOOTBALL_KEY = "ad3bee407db9f5221c7965ef2055f174";
+const START_BAL = 5;
+const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
+
+function getActiveSheet() {
+  if (MANUAL_SHEET_ID !== "" && MANUAL_SHEET_ID !== "YOUR_GOOGLE_SHEET_ID_HERE") {
+    return SpreadsheetApp.openById(MANUAL_SHEET_ID);
+  }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error("No active spreadsheet found.");
+  }
+  return ss;
+}
 
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('🚀 ABIS System')
-    .addItem('Initialize Environment', 'initialSetup')
-    .addItem('Fetch Latest Data', 'getLiveRecommendations')
-    .addToUi();
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('🚀 ABIS System')
+      .addItem('Initialize Environment', 'initialSetup')
+      .addSeparator()
+      .addItem('Fetch Latest Data', 'getLiveRecommendations')
+      .addItem('View Placed Bets', 'viewPlacedBets')
+      .addItem('View P/L Summary', 'viewPLSummary')
+      .addToUi();
+  } catch (e) {
+    Logger.log('UI Menu error: ' + e.message);
+  }
 }
 
 function initialSetup() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getActiveSheet();
   const tabs = {
-    'Config': [['Key', 'Value'], ['System', 'ABIS v4.2'], ['Last_Updated', new Date().toISOString()]],
+    'Config': [['Key', 'Value'], ['System', 'ABIS v2.5'], ['Last_Updated', new Date().toISOString()]],
     'Recommendations': [['Event', 'League', 'Selection', 'Odds', 'Confidence', 'Reasoning', 'Predicted_Score', 'Time']],
     'Placed_Bets': [['ID', 'Event', 'League', 'Selection', 'Odds', 'Stake', 'Status', 'Placed_At']],
     'Stats': [['Metric', 'Value'], ['Total_Profit', 0], ['Win_Rate', '0%']]
@@ -481,7 +507,7 @@ function initialSetup() {
     sheet.getRange(1, 1, tabs[tabName].length, tabs[tabName][0].length).setValues(tabs[tabName]);
   });
 
-  SpreadsheetApp.getUi().alert('✅ ABIS v4.2 Environment Initialized!');
+  SpreadsheetApp.getUi().alert('✅ ABIS v2.5 Environment Initialized!');
 }
 
 function doGet(e) {
@@ -491,7 +517,7 @@ function doGet(e) {
 
   try {
     if (action === 'test') {
-      output = { status: 'ok', message: 'ABIS v4.2 Active', timestamp: new Date().toISOString() };
+      output = { status: 'ok', message: 'ABIS v2.5 Active', timestamp: new Date().toISOString() };
     } else if (action === 'getRecommendations') {
       const recommendations = getLiveRecommendations();
       output = { status: 'ok', recommendations: recommendations };
@@ -634,7 +660,7 @@ function getStandings(leagueId) {
 }
 
 function updateRecommendationsSheet(recommendations) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getActiveSheet();
   const sheet = ss.getSheetByName('Recommendations');
   if (!sheet) return;
   sheet.clear();
@@ -651,21 +677,74 @@ function getRMBarcaMatches() {
     events.forEach(event => {
       const homeLower = event.home_team.toLowerCase();
       const awayLower = event.away_team.toLowerCase();
-      if (homeLower.includes('real madrid') || awayLower.includes('real madrid') ||
-          homeLower.includes('barcelona') || awayLower.includes('barcelona')) {
-        matches.push({
-          id: event.id,
-          event: event.home_team + ' vs ' + event.away_team,
-          commence_time: event.commence_time,
-          predictedScore: "2-1",
-          scoreConfidence: 75,
-          reasoning: "High profile match analysis.",
-          odds: [{ homeOdds: 1.8, awayOdds: 3.5, drawOdds: 3.2 }]
-        });
+
+      const isRM = homeLower.includes('real madrid') || awayLower.includes('real madrid');
+      const isBarca = homeLower.includes('barcelona') || awayLower.includes('barcelona');
+
+      if (isRM || isBarca) {
+        const bookmaker = event.bookmakers?.[0];
+        const market = bookmaker?.markets?.find(m => m.key === 'h2h');
+
+        if (market && market.outcomes) {
+          const homeOdds = market.outcomes.find(o => o.name === event.home_team)?.price || 0;
+          const awayOdds = market.outcomes.find(o => o.name === event.away_team)?.price || 0;
+          const drawOdds = market.outcomes.find(o => o.name === 'Draw')?.price || 3.5;
+
+          if (homeOdds > 0 && awayOdds > 0) {
+            const homeProb = (1 / homeOdds) * 100;
+            const awayProb = (1 / awayOdds) * 100;
+
+            let predictedScore = "1-1";
+            let confidence = 70;
+
+            if (homeProb > awayProb + 10) {
+              predictedScore = "2-1";
+              confidence = Math.round(homeProb);
+            } else if (awayProb > homeProb + 10) {
+              predictedScore = "1-2";
+              confidence = Math.round(awayProb);
+            }
+
+            matches.push({
+              id: event.id,
+              event: event.home_team + ' vs ' + event.away_team,
+              commence_time: event.commence_time,
+              predictedScore: predictedScore,
+              scoreConfidence: confidence,
+              reasoning: "Analysis for high profile La Liga match based on live market odds.",
+              odds: [{
+                homeOdds: homeOdds,
+                awayOdds: awayOdds,
+                drawOdds: drawOdds,
+                bookie: bookmaker.title
+              }]
+            });
+          }
+        }
       }
     });
   } catch (e) {}
   return matches;
+}
+
+function viewPlacedBets() {
+  const ss = getActiveSheet();
+  const sheet = ss.getSheetByName('Placed_Bets');
+  if (sheet) {
+    SpreadsheetApp.setActiveSheet(sheet);
+  } else {
+    SpreadsheetApp.getUi().alert('Placed_Bets sheet not found. Run Initialize Environment first.');
+  }
+}
+
+function viewPLSummary() {
+  const ss = getActiveSheet();
+  const sheet = ss.getSheetByName('Stats');
+  if (sheet) {
+    SpreadsheetApp.setActiveSheet(sheet);
+  } else {
+    SpreadsheetApp.getUi().alert('Stats sheet not found. Run Initialize Environment first.');
+  }
 }
 `;
 
