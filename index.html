@@ -3,8 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS UK Betting Intelligence - Dashboard</title>
+  <title>ABIS Live - UK Intelligence v1.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: 0; }
+    }
+    .animate-in { animation: fadeIn 0.7s ease-out; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-200">
   <div id="root"></div>
@@ -16,430 +25,1324 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // ============================================================================
-    // JSONP Helper for cross-origin Google Apps Script
-    // ============================================================================
-    const jsonp = (baseUrl, params = {}) => {
-      return new Promise((resolve, reject) => {
-        const cbName = '__abis_' + Math.random().toString(36).slice(2);
-        const url = new URL(baseUrl);
-        url.searchParams.set('action', params.action || 'test');
-        url.searchParams.set('callback', cbName);
-        const script = document.createElement('script');
-        script.src = url.toString();
-        const cleanup = () => {
-          try { script.parentNode?.removeChild(script); } catch (_) {}
-          delete window[cbName];
-        };
-        const t = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 60000);
-        window[cbName] = (data) => { clearTimeout(t); cleanup(); resolve(data); };
-        script.onerror = () => { clearTimeout(t); cleanup(); reject(new Error('Failed')); };
-        document.body.appendChild(script);
-      });
-    };
+    // Lucide Icons as inline SVG components
+    const Shield = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    );
 
-    // ============================================================================
-    // MAIN APP
-    // ============================================================================
+    const TrendingUp = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+    );
+
+    const Zap = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    );
+
+    const LayoutDashboard = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+      </svg>
+    );
+
+    const Database = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+      </svg>
+    );
+
+    const History = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
+      </svg>
+    );
+
+    const Wallet = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+      </svg>
+    );
+
+    const Users = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    );
+
+    const ArrowUpRight = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+      </svg>
+    );
+
+    const CheckCircle2 = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/>
+      </svg>
+    );
+
+    const Copy = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+    );
+
+    const Info = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+    );
+
+    const Gift = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+      </svg>
+    );
+
+    const Calculator = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="16" y1="18" x2="16" y2="18.01"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="8" y1="18" x2="8" y2="18.01"/>
+      </svg>
+    );
+
+    const Menu = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    );
+
+    const X = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    );
+
+    const CheckSquare = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    );
+
     const App = () => {
-      // Connection state
-      const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem('abis_url') || '');
+      // Configuration - must be defined before useState that references it
+      const CONFIG = {
+        geminiKey: "", // API key removed for security - configure in Google Sheets
+        oddsKey: "", // API key removed for security - configure in Google Sheets
+        sheetId: "", // Your Google Sheet ID - will be fetched from Web App
+        webAppUrl: localStorage.getItem('abis_webapp_url') || ""
+      };
+
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [initialCapital, setInitialCapital] = useState("");
+      const [currentBankroll, setCurrentBankroll] = useState(0);
+      const [userStakeInput, setUserStakeInput] = useState(10);
+      const [copySuccess, setCopySuccess] = useState(false);
+      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [placedBets, setPlacedBets] = useState([]);
+      const [settledBets, setSettledBets] = useState([]);
       const [isConnected, setIsConnected] = useState(false);
-      
-      // Data state
-      const [allBets, setAllBets] = useState([]);
-      const [isLoading, setIsLoading] = useState(false);
-      const [lastUpdate, setLastUpdate] = useState(null);
-      
-      // Settings
-      const [defaultStake, setDefaultStake] = useState(parseFloat(localStorage.getItem('defaultStake') || '10'));
-      
-      // Bet tracking
-      const [placedBets, setPlacedBets] = useState(JSON.parse(localStorage.getItem('placedBets') || '[]'));
-      const [settledBets, setSettledBets] = useState(JSON.parse(localStorage.getItem('settledBets') || '[]'));
+      const [isSyncing, setIsSyncing] = useState(false);
+      const [webAppUrl, setWebAppUrl] = useState(CONFIG.webAppUrl);
+      const [lastSyncTime, setLastSyncTime] = useState(null);
 
-      // Save settings to localStorage
+      // Load data from localStorage on mount
       useEffect(() => {
-        localStorage.setItem('defaultStake', defaultStake.toString());
-      }, [defaultStake]);
-
-      useEffect(() => {
-        localStorage.setItem('placedBets', JSON.stringify(placedBets));
-      }, [placedBets]);
-
-      useEffect(() => {
-        localStorage.setItem('settledBets', JSON.stringify(settledBets));
-      }, [settledBets]);
-
-      // Test connection
-      const testConnection = async () => {
-        if (!webAppUrl) {
-          alert('Please enter your Web App URL');
-          return;
-        }
-        try {
-          const data = await jsonp(webAppUrl, { action: 'test' });
-          if (data.status === 'ok') {
-            setIsConnected(true);
-            localStorage.setItem('abis_url', webAppUrl);
-            alert('✅ Connected successfully!');
-          } else {
-            alert('❌ Connection failed');
-          }
-        } catch (error) {
-          alert('❌ Error: ' + error.message);
-        }
-      };
-
-      // Fetch live opportunities
-      const fetchData = async () => {
-        if (!isConnected) {
-          alert('Please connect first');
-          return;
-        }
-        setIsLoading(true);
-        try {
-          const data = await jsonp(webAppUrl, { action: 'getRecommendations' });
-          if (data.status === 'ok' && Array.isArray(data.recommendations)) {
-            setAllBets(data.recommendations);
-            setLastUpdate(new Date());
-          } else {
-            alert('Error fetching data');
-          }
-        } catch (error) {
-          alert('Fetch failed: ' + error.message);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      // Auto-connect on mount
-      useEffect(() => {
-        if (webAppUrl) {
-          jsonp(webAppUrl, { action: 'test' }).then(d => {
-            if (d.status === 'ok') setIsConnected(true);
-          }).catch(() => {});
+        const savedBankroll = localStorage.getItem('abis_bankroll');
+        const savedPlacedBets = localStorage.getItem('abis_placed_bets');
+        const savedSettledBets = localStorage.getItem('abis_settled_bets');
+        const savedWebAppUrl = localStorage.getItem('abis_webapp_url');
+        
+        if (savedBankroll) setCurrentBankroll(parseFloat(savedBankroll));
+        if (savedPlacedBets) setPlacedBets(JSON.parse(savedPlacedBets));
+        if (savedSettledBets) setSettledBets(JSON.parse(savedSettledBets));
+        if (savedWebAppUrl) {
+          setWebAppUrl(savedWebAppUrl);
+          testConnection(savedWebAppUrl);
         }
       }, []);
 
-      // Calculate P&L
-      const totalStaked = settledBets.reduce((sum, bet) => sum + bet.stake, 0);
-      const totalReturns = settledBets.reduce((sum, bet) => sum + (bet.won ? bet.stake * bet.odds : 0), 0);
-      const profitLoss = totalReturns - totalStaked;
-      const roi = totalStaked > 0 ? ((profitLoss / totalStaked) * 100).toFixed(1) : 0;
-
-      // Group by league
-      const byLeague = {};
-      allBets.forEach(bet => {
-        if (!byLeague[bet.league]) byLeague[bet.league] = [];
-        byLeague[bet.league].push(bet);
-      });
-
-      // Top 3 bets
-      const top3 = [...allBets].sort((a, b) => b.confidence - a.confidence).slice(0, 3);
-
-      // Today's games
-      const today = new Date().toDateString();
-      const todayGames = allBets.filter(bet => new Date(bet.commence_time).toDateString() === today);
-
-      // Best accumulator (top 3 highest confidence)
-      const accumulator = top3.length === 3 ? {
-        bets: top3,
-        combinedOdds: top3.reduce((acc, bet) => acc * bet.odds, 1).toFixed(2),
-        potential: (defaultStake * top3.reduce((acc, bet) => acc * bet.odds, 1)).toFixed(2)
-      } : null;
-
-      // Place bet
-      const placeBet = (bet, stake = defaultStake) => {
-        const newBet = {
-          id: Date.now(),
-          ...bet,
-          stake,
-          placedAt: new Date().toISOString()
-        };
-        setPlacedBets([...placedBets, newBet]);
-      };
-
-      // Settle bet
-      const settleBet = (betId, won) => {
-        const bet = placedBets.find(b => b.id === betId);
-        if (bet) {
-          setSettledBets([...settledBets, { ...bet, won, settledAt: new Date().toISOString() }]);
-          setPlacedBets(placedBets.filter(b => b.id !== betId));
+      // Test connection to Google Sheets
+      const testConnection = async (url) => {
+        if (!url) {
+          setIsConnected(false);
+          return;
+        }
+        
+        try {
+          const response = await fetch(url + '?action=test', {
+            method: 'GET',
+            mode: 'cors'
+          });
+          const data = await response.json();
+          setIsConnected(data.status === 'ok');
+          if (data.status === 'ok') {
+            console.log('✅ Connected to Google Sheets');
+          }
+        } catch (error) {
+          console.error('❌ Connection failed:', error);
+          setIsConnected(false);
         }
       };
 
-      return (
-        <div className="min-h-screen p-6">
-          {/* Header */}
-          <div className="max-w-7xl mx-auto mb-8">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-6">
-              <h1 className="text-4xl font-black text-white mb-2">ABIS UK BETTING INTELLIGENCE</h1>
-              <p className="text-blue-100">Live odds analysis across all UK football leagues</p>
-            </div>
+      // Sync data to Google Sheets
+      const syncToSheets = async () => {
+        if (!webAppUrl || !isConnected) {
+          alert('Please connect to Google Sheets first!');
+          return;
+        }
 
-            {/* Connection */}
-            {!isConnected && (
-              <div className="bg-slate-900 rounded-2xl p-6 mb-6">
-                <h2 className="text-xl font-bold mb-4">Connect to Your Backend</h2>
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={webAppUrl}
-                    onChange={(e) => setWebAppUrl(e.target.value)}
-                    placeholder="Enter your Google Apps Script Web App URL"
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
-                  />
-                  <button
-                    onClick={testConnection}
-                    className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold"
-                  >
-                    CONNECT
-                  </button>
+        setIsSyncing(true);
+        
+        try {
+          // Push placed bets
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'syncPlacedBets',
+              data: placedBets
+            })
+          });
+
+          // Push settled bets
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'syncSettledBets',
+              data: settledBets
+            })
+          });
+
+          // Update P/L trends
+          const stats = calculateStats();
+          await fetch(webAppUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'updatePL',
+              data: {
+                date: new Date().toISOString(),
+                balance: currentBankroll,
+                netProfit: stats.netProfit,
+                winRate: stats.winRate,
+                totalBets: stats.totalBets
+              }
+            })
+          });
+
+          setLastSyncTime(new Date());
+          alert('✅ Data synced to Google Sheets successfully!');
+        } catch (error) {
+          console.error('Sync error:', error);
+          alert('❌ Sync failed. Check console for details.');
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      // Save Web App URL
+      const saveWebAppUrl = (url) => {
+        setWebAppUrl(url);
+        localStorage.setItem('abis_webapp_url', url);
+        CONFIG.webAppUrl = url;
+        testConnection(url);
+      };
+
+      // Save to localStorage whenever data changes
+      useEffect(() => {
+        if (currentBankroll > 0) {
+          localStorage.setItem('abis_bankroll', currentBankroll.toString());
+        }
+      }, [currentBankroll]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_placed_bets', JSON.stringify(placedBets));
+      }, [placedBets]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_settled_bets', JSON.stringify(settledBets));
+      }, [settledBets]);
+
+      // State for live opportunities
+      const [opportunities, setOpportunities] = useState([]);
+      const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
+      const [lastDataFetch, setLastDataFetch] = useState(null);
+      const [laLigaMatches, setLaLigaMatches] = useState([]);
+      const [isLoadingLaLiga, setIsLoadingLaLiga] = useState(false);
+
+      // Fetch live opportunities from The Odds API via Google Sheets Web App
+      const fetchLiveOpportunities = async () => {
+        if (!webAppUrl || !isConnected) {
+          console.log('Not connected to sheets - showing sample data');
+          return;
+        }
+
+        setIsLoadingOpportunities(true);
+        
+        try {
+          const response = await fetch(webAppUrl + '?action=getRecommendations', {
+            method: 'GET',
+            mode: 'cors'
+          });
+          
+          const data = await response.json();
+          
+          if (data.status === 'ok' && data.recommendations) {
+            // Sort by confidence (highest first)
+            const sorted = data.recommendations.sort((a, b) => b.confidence - a.confidence);
+            setOpportunities(sorted);
+            setLastDataFetch(new Date());
+            console.log('✅ Loaded', data.recommendations.length, 'live opportunities');
+          }
+        } catch (error) {
+          console.error('Failed to fetch opportunities:', error);
+        } finally {
+          setIsLoadingOpportunities(false);
+        }
+      };
+
+      // Fetch La Liga matches
+      const fetchLaLigaMatches = async () => {
+        if (!webAppUrl || !isConnected) {
+          console.log('Not connected to sheets');
+          return;
+        }
+
+        setIsLoadingLaLiga(true);
+        
+        try {
+          const response = await fetch(webAppUrl + '?action=getElClasico', {
+            method: 'GET',
+            mode: 'cors'
+          });
+          
+          const data = await response.json();
+          
+          if (data.status === 'ok' && data.matches) {
+            setLaLigaMatches(data.matches);
+            console.log('✅ Loaded', data.matches.length, 'La Liga matches');
+          }
+        } catch (error) {
+          console.error('Failed to fetch La Liga matches:', error);
+        } finally {
+          setIsLoadingLaLiga(false);
+        }
+      };
+
+      // Auto-fetch on connection
+      useEffect(() => {
+        if (isConnected && webAppUrl) {
+          fetchLiveOpportunities();
+        }
+      }, [isConnected]);
+
+      // Auto-fetch La Liga when switching to that tab
+      useEffect(() => {
+        if (activeTab === 'laliga' && isConnected && webAppUrl && laLigaMatches.length === 0) {
+          fetchLaLigaMatches();
+        }
+      }, [activeTab, isConnected]);
+
+      // Helper to check if event is today
+      const isToday = (dateString) => {
+        const eventDate = new Date(dateString);
+        const today = new Date();
+        return eventDate.toDateString() === today.toDateString();
+      };
+
+      // Helper to check if event is within 2 days
+      const isWithin2Days = (dateString) => {
+        const eventDate = new Date(dateString);
+        const now = new Date();
+        const twoDaysFromNow = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+        return eventDate >= now && eventDate <= twoDaysFromNow;
+      };
+      const handleSetBankroll = () => {
+        const val = parseFloat(initialCapital);
+        if (!isNaN(val) && val > 0) setCurrentBankroll(val);
+      };
+
+      const handlePlaceBet = (opp, customStake) => {
+        const stake = parseFloat(customStake) || parseFloat(userStakeInput);
+        
+        if (currentBankroll < stake) {
+          alert('Insufficient bankroll for this bet!');
+          return;
+        }
+        
+        const newBet = {
+          id: Date.now(),
+          oppId: opp.id,
+          event: opp.event,
+          league: opp.league,
+          selection: opp.selection,
+          type: opp.type,
+          bookie: opp.bookie,
+          odds: opp.odds,
+          stake: stake,
+          potentialReturn: (stake * opp.odds).toFixed(2),
+          profit: ((stake * opp.odds) - stake).toFixed(2),
+          confidence: opp.confidence,
+          placedAt: new Date().toISOString(),
+          status: 'pending'
+        };
+        
+        const updatedPlacedBets = [...placedBets, newBet];
+        const updatedBankroll = currentBankroll - stake;
+        
+        setPlacedBets(updatedPlacedBets);
+        setCurrentBankroll(updatedBankroll);
+        
+        // Save immediately to localStorage
+        localStorage.setItem('abis_placed_bets', JSON.stringify(updatedPlacedBets));
+        localStorage.setItem('abis_bankroll', updatedBankroll.toString());
+      };
+
+      const handleUpdateOdds = (betId, newOdds) => {
+        const updatedBets = placedBets.map(bet => {
+          if (bet.id === betId) {
+            const updatedPotentialReturn = (bet.stake * newOdds).toFixed(2);
+            const updatedProfit = (updatedPotentialReturn - bet.stake).toFixed(2);
+            return {
+              ...bet,
+              odds: newOdds,
+              potentialReturn: updatedPotentialReturn,
+              profit: updatedProfit
+            };
+          }
+          return bet;
+        });
+        
+        setPlacedBets(updatedBets);
+        localStorage.setItem('abis_placed_bets', JSON.stringify(updatedBets));
+      };
+
+      const handleSettleBet = (betId, won) => {
+        const bet = placedBets.find(b => b.id === betId);
+        if (!bet) return;
+
+        const settledBet = {
+          ...bet,
+          status: won ? 'won' : 'lost',
+          settledAt: new Date().toISOString(),
+          actualReturn: won ? parseFloat(bet.potentialReturn) : 0
+        };
+
+        setSettledBets([...settledBets, settledBet]);
+        setPlacedBets(placedBets.filter(b => b.id !== betId));
+        
+        if (won) {
+          setCurrentBankroll(prev => prev + parseFloat(bet.potentialReturn));
+        }
+      };
+
+      const calculateStats = () => {
+        const totalBets = settledBets.length;
+        const wonBets = settledBets.filter(b => b.status === 'won').length;
+        const totalStaked = settledBets.reduce((sum, b) => sum + b.stake, 0);
+        const totalReturns = settledBets.reduce((sum, b) => sum + b.actualReturn, 0);
+        const netProfit = totalReturns - totalStaked;
+        const winRate = totalBets > 0 ? ((wonBets / totalBets) * 100).toFixed(1) : 0;
+
+        return { totalBets, wonBets, totalStaked, totalReturns, netProfit, winRate };
+      };
+
+      const generateScript = () => `/**
+ * ABIS UK LIVE PRODUCTION ENGINE - v2.5
+ * Complete Web App with REST API endpoints for website sync
+ * 
+ * SECURITY NOTE: Your API keys are stored here in Google Apps Script,
+ * which is private and not exposed in your public website code.
+ */
+
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
+const ODDS_API_KEY = "YOUR_ODDS_API_KEY_HERE";
+const START_BAL = ${currentBankroll};
+const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
+
+// Copy the complete script from: google-apps-script-webapp.js
+// The rest of the code remains the same...
+
+function getActiveSheet() {
+  if (MANUAL_SHEET_ID !== "") {
+    return SpreadsheetApp.openById(MANUAL_SHEET_ID);
+  }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error("No active spreadsheet found.");
+  }
+  return ss;
+}
+
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('🚀 ABIS System')
+      .addItem('Initialize Environment', 'initialSetup')
+      .addSeparator()
+      .addItem('View Placed Bets', 'viewPlacedBets')
+      .addItem('View P/L Summary', 'viewPLSummary')
+      .addToUi();
+  } catch (e) {
+    Logger.log('UI Menu error: ' + e.message);
+  }
+}
+
+// NOTE: For the complete script with all functions (doGet, doPost, sync functions),
+// download the google-apps-script-webapp.js file and replace the placeholder values above.
+`;
+
+      const copyToClipboard = () => {
+        const el = document.createElement('textarea');
+        el.value = generateScript();
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      };
+
+      const OpportunityCard = ({ opp }) => {
+        const [customStake, setCustomStake] = useState('');
+        const [isPlacing, setIsPlacing] = useState(false);
+        const [showAdditional, setShowAdditional] = useState(false);
+        const [isExpanded, setIsExpanded] = useState(false);
+        const stakeToUse = customStake || userStakeInput;
+        const potReturn = (stakeToUse * opp.odds).toFixed(2);
+        const profit = (potReturn - stakeToUse).toFixed(2);
+        const alreadyPlaced = placedBets.some(b => b.oppId === opp.id);
+        const isHighConfidence = opp.confidence >= 90;
+
+        return (
+          <div className={`bg-slate-900 border rounded-3xl flex flex-col hover:border-blue-500/50 transition-all shadow-xl ${
+            isHighConfidence ? 'border-emerald-500/40 ring-2 ring-emerald-500/20' : 'border-slate-800'
+          }`}>
+            {/* Collapsed Header */}
+            <div 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-6 cursor-pointer"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      opp.type === 'Matched Bet' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                    }`}>
+                      {opp.type}
+                    </span>
+                    {isHighConfidence && (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        ⭐ HIGH CONFIDENCE
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-1">{opp.event}</h3>
+                  <p className="text-xs text-blue-400 font-bold mb-2">{opp.league}</p>
+                  <p className="text-sm text-slate-300 font-bold">{opp.selection} @ {opp.odds}</p>
+                </div>
+                <div className="text-right ml-4">
+                  <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-widest">Confidence</span>
+                  <span className={`text-2xl font-black ${isHighConfidence ? 'text-emerald-400' : 'text-white'}`}>
+                    {opp.confidence}%
+                  </span>
+                  <div className="mt-2 text-slate-500">
+                    {isExpanded ? '▼' : '▶'}
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Controls */}
-            {isConnected && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-900 rounded-2xl p-6">
-                  <label className="text-sm text-slate-400 block mb-2">Default Stake (£)</label>
-                  <input
-                    type="number"
-                    value={defaultStake}
-                    onChange={(e) => setDefaultStake(parseFloat(e.target.value) || 10)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-2xl font-bold"
-                  />
+            {/* Expanded Content */}
+            {isExpanded && (
+              <div className="px-6 pb-6 animate-in fade-in">
+                <div className="flex items-center gap-2 mb-4 text-xs text-slate-400 bg-slate-800/50 w-fit px-3 py-1.5 rounded-lg border border-slate-700">
+                  <Users size={14} className="text-blue-400" />
+                  <span className="font-bold">{opp.customerType}</span>
                 </div>
-                
-                <div className="bg-slate-900 rounded-2xl p-6">
-                  <p className="text-sm text-slate-400 mb-2">Profit/Loss</p>
-                  <p className={`text-3xl font-black ${profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    £{profitLoss.toFixed(2)}
+
+                <div className="grid grid-cols-1 gap-3 mb-4">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Bookmaker</p>
+                      <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1">
+                        Visit Site <ArrowUpRight size={10}/>
+                      </a>
+                    </div>
+                    <p className="text-sm font-bold text-white">{opp.bookie} @ <span className="text-blue-400">{opp.odds}</span></p>
+                  </div>
+                  
+                  {opp.type === 'Matched Bet' && opp.laySite && (
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="text-[10px] text-pink-500 font-bold uppercase tracking-wider">Lay Exchange</p>
+                        <a href={opp.layUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-pink-400 hover:underline flex items-center gap-1">
+                          Visit Site <ArrowUpRight size={10}/>
+                        </a>
+                      </div>
+                      <p className="text-sm font-bold text-white">{opp.laySite} @ <span className="text-pink-400">{opp.layOdds}</span></p>
+                    </div>
+                  )}
+                </div>
+
+                {opp.offerDetails && (
+                  <div className="mb-4 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-3 items-start">
+                    <Gift className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-300 font-medium leading-snug">{opp.offerDetails}</p>
+                  </div>
+                )}
+
+                <div className="mb-4 space-y-3">
+                  <div className="p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                    <p className="text-[10px] text-blue-400 font-black uppercase mb-1">Strategy</p>
+                    <p className="text-xs text-slate-400 italic leading-relaxed font-medium">"{opp.strategy}"</p>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                    <span className="text-slate-300 font-bold">Analysis:</span> {opp.reasoning}
                   </p>
-                  <p className="text-sm text-slate-500">ROI: {roi}%</p>
                 </div>
-                
-                <button
-                  onClick={fetchData}
-                  disabled={isLoading}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 rounded-2xl p-6 font-bold text-xl"
-                >
-                  {isLoading ? '⏳ LOADING...' : '🔄 REFRESH DATA'}
-                </button>
-              </div>
-            )}
-          </div>
 
-          {!isConnected ? (
-            <div className="max-w-7xl mx-auto text-center py-20">
-              <p className="text-2xl text-slate-600">Connect to your backend to see live betting opportunities</p>
-            </div>
-          ) : allBets.length === 0 ? (
-            <div className="max-w-7xl mx-auto text-center py-20">
-              <p className="text-2xl text-slate-600">Click REFRESH DATA to load opportunities</p>
-            </div>
-          ) : (
-            <div className="max-w-7xl mx-auto grid gap-6">
-              
-              {/* TOP 3 BETS */}
-              <div className="bg-gradient-to-r from-emerald-600 to-green-600 rounded-3xl p-8">
-                <h2 className="text-3xl font-black text-white mb-6">🏆 TOP 3 BETS</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {top3.map((bet, idx) => (
-                    <div key={idx} className="bg-white/10 backdrop-blur rounded-2xl p-6">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-4xl font-black text-white">#{idx + 1}</span>
-                        <span className="bg-white text-emerald-600 px-3 py-1 rounded-full text-sm font-black">
-                          {bet.confidence}%
+                {/* Additional Bet Options */}
+                {opp.additionalBets && opp.additionalBets.length > 0 && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowAdditional(!showAdditional)}
+                      className="w-full p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-center justify-between hover:bg-amber-500/10 transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Zap className="text-amber-400" size={14} />
+                        <span className="text-xs font-black text-amber-400 uppercase">
+                          +{opp.additionalBets.length} Alternative Bet{opp.additionalBets.length > 1 ? 's' : ''} Available
                         </span>
                       </div>
-                      <p className="text-white font-bold text-lg mb-2">{bet.event}</p>
-                      <p className="text-emerald-100 text-sm mb-3">{bet.league}</p>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <p className="text-emerald-100 text-xs">Selection</p>
-                          <p className="text-white font-black">{bet.selection}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-emerald-100 text-xs">Odds</p>
-                          <p className="text-white font-black text-xl">{bet.odds.toFixed(2)}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => placeBet(bet)}
-                        className="w-full bg-white text-emerald-600 font-black py-3 rounded-xl hover:bg-emerald-50"
-                      >
-                        PLACE £{defaultStake} BET
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                      <span className="text-amber-400 text-xs font-bold">
+                        {showAdditional ? '▼' : '▶'}
+                      </span>
+                    </button>
 
-              {/* ACCUMULATOR */}
-              {accumulator && (
-                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-8">
-                  <h2 className="text-3xl font-black text-white mb-4">🎯 SUGGESTED ACCUMULATOR</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-purple-100 text-sm mb-3">Combined Odds: <span className="text-white font-black text-2xl">{accumulator.combinedOdds}</span></p>
-                      <p className="text-purple-100 text-sm mb-4">Potential Return: <span className="text-white font-black text-2xl">£{accumulator.potential}</span></p>
-                      <div className="space-y-2">
-                        {accumulator.bets.map((bet, idx) => (
-                          <div key={idx} className="bg-white/10 rounded-xl p-3">
-                            <p className="text-white font-bold text-sm">{bet.event}</p>
-                            <p className="text-purple-100 text-xs">{bet.selection} @ {bet.odds.toFixed(2)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <button
-                        onClick={() => {
-                          const accBet = {
-                            event: 'Accumulator (3-fold)',
-                            selection: accumulator.bets.map(b => b.selection).join(' + '),
-                            odds: parseFloat(accumulator.combinedOdds),
-                            league: 'Multi',
-                            confidence: Math.round(accumulator.bets.reduce((sum, b) => sum + b.confidence, 0) / 3)
-                          };
-                          placeBet(accBet);
-                        }}
-                        className="bg-white text-purple-600 font-black px-12 py-6 rounded-2xl text-xl hover:bg-purple-50"
-                      >
-                        PLACE ACCA<br/>£{defaultStake}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TODAY'S GAMES */}
-              {todayGames.length > 0 && (
-                <div className="bg-slate-900 rounded-3xl p-8">
-                  <h2 className="text-3xl font-black text-white mb-6">⚡ PLAYING TODAY ({todayGames.length})</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {todayGames.map((bet, idx) => (
-                      <div key={idx} className="bg-amber-500/20 border-2 border-amber-500 rounded-2xl p-4">
-                        <span className="bg-amber-500 text-black px-2 py-1 rounded-full text-xs font-black">TODAY</span>
-                        <p className="text-white font-bold mt-2">{bet.event}</p>
-                        <p className="text-slate-400 text-sm">{bet.selection} @ {bet.odds.toFixed(2)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ALL LEAGUES */}
-              {Object.keys(byLeague).map(league => (
-                <div key={league} className="bg-slate-900 rounded-3xl p-8">
-                  <h2 className="text-2xl font-black text-white mb-6">{league}</h2>
-                  <div className="grid gap-4">
-                    {byLeague[league].map((bet, idx) => {
-                      const isToday = new Date(bet.commence_time).toDateString() === today;
-                      return (
-                        <div key={idx} className={`bg-slate-800 rounded-2xl p-6 border-2 ${isToday ? 'border-amber-500' : 'border-transparent'}`}>
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              {isToday && <span className="bg-amber-500 text-black px-2 py-1 rounded-full text-xs font-black mr-2">TODAY</span>}
-                              <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black">{bet.confidence}%</span>
-                              <h3 className="text-xl font-bold text-white mt-3">{bet.event}</h3>
-                              <p className="text-sm text-slate-400 mt-2">{bet.reasoning}</p>
+                    {showAdditional && (
+                      <div className="mt-3 space-y-2 animate-in fade-in">
+                        {opp.additionalBets.map((addBet, idx) => (
+                          <div key={idx} className="p-4 bg-slate-950 border border-slate-700 rounded-xl">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-white mb-1">{addBet.selection}</p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed">{addBet.reasoning}</p>
+                              </div>
+                              <div className="text-right ml-3">
+                                <p className="text-[9px] text-slate-500 uppercase mb-0.5">Odds</p>
+                                <p className="text-lg font-black text-emerald-400">{addBet.odds}</p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="grid grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl">
-                            <div>
-                              <p className="text-xs text-slate-500">Selection</p>
-                              <p className="text-emerald-400 font-bold">{bet.selection}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Odds</p>
-                              <p className="text-blue-400 font-bold text-lg">{bet.odds.toFixed(2)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500">Predicted</p>
-                              <p className="text-white font-bold">{bet.predictedScore}</p>
-                            </div>
-                            <div>
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 uppercase">Confidence</span>
+                                <span className="text-xs font-bold text-white">{addBet.confidence}%</span>
+                              </div>
                               <button
-                                onClick={() => placeBet(bet)}
-                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg"
+                                onClick={() => {
+                                  const newOpp = {
+                                    ...opp,
+                                    id: Date.now() + idx,
+                                    selection: addBet.selection,
+                                    odds: addBet.odds,
+                                    confidence: addBet.confidence,
+                                    reasoning: addBet.reasoning
+                                  };
+                                  handlePlaceBet(newOpp, customStake);
+                                }}
+                                disabled={currentBankroll < stakeToUse}
+                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg text-[10px] font-black transition-all"
                               >
-                                BET £{defaultStake}
+                                PLACE
                               </button>
                             </div>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Stake Input */}
+                {!alreadyPlaced && (
+                  <div className="mb-4 p-4 bg-slate-950 rounded-2xl border border-slate-700">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Custom Stake (Optional)</p>
+                    <div className="flex items-center">
+                      <span className="text-lg font-black text-slate-500 mr-1">£</span>
+                      <input 
+                        type="number"
+                        placeholder={userStakeInput}
+                        className="bg-transparent text-lg font-bold text-white w-full focus:outline-none"
+                        value={customStake}
+                        onChange={(e) => setCustomStake(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-auto pt-4 border-t border-slate-800">
+                  {alreadyPlaced ? (
+                    <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                      <CheckSquare size={20} className="text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-400">Bet Placed - Track in History</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center mb-4">
+                        <div>
+                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase">Est. Return</p>
+                          <p className="text-2xl font-black text-emerald-400">£{potReturn}</p>
                         </div>
-                      );
-                    })}
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase">Net Profit</p>
+                          <p className="text-lg font-bold text-white">£{profit}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsPlacing(true);
+                          setTimeout(() => {
+                            handlePlaceBet(opp, customStake);
+                            setIsPlacing(false);
+                          }, 500);
+                        }}
+                        disabled={isPlacing || currentBankroll < stakeToUse}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-2xl font-black text-sm transition-all active:scale-95"
+                      >
+                        {isPlacing ? 'PLACING...' : currentBankroll < stakeToUse ? 'INSUFFICIENT BANKROLL' : 'PLACE BET'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const stats = calculateStats();
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-200">
+          
+          {/* Persistent Navigation Header */}
+          <nav className="fixed top-0 left-0 right-0 h-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 z-50 px-6 lg:px-12 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-600/20">
+                <Shield className="text-white" size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v2.0</p>
+              </div>
+            </div>
+
+            {/* Desktop Nav */}
+            <div className="hidden lg:flex items-center gap-2">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                { id: 'laliga', label: 'La Liga', icon: TrendingUp },
+                { id: 'setup', label: 'Provisioning', icon: Database },
+                { id: 'history', label: 'Bet History', icon: History }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                  <tab.icon size={16} /> {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button className="lg:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X /> : <Menu />}
+            </button>
+
+            {/* Connection Status Indicator */}
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-xs font-bold text-slate-400">
+                {isConnected ? 'Sheets Connected' : 'Not Connected'}
+              </span>
+            </div>
+          </nav>
+
+          {/* Mobile Menu */}
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 top-20 bg-slate-950 z-40 p-6 flex flex-col gap-4 lg:hidden">
+              {['dashboard', 'laliga', 'setup', 'history'].map(id => (
+                <button
+                  key={id}
+                  onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+                  className={`w-full p-4 rounded-2xl text-left font-bold capitalize ${activeTab === id ? 'bg-blue-600' : 'bg-slate-900'}`}
+                >
+                  {id === 'setup' ? 'Provisioning' : id}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <main className="pt-28 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
+            
+            {activeTab === 'dashboard' && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
+                    <p className="text-slate-500 font-medium">
+                      Real-time UK & European Market Analysis
+                      {lastDataFetch && (
+                        <span className="ml-2 text-xs">
+                          • Last updated: {lastDataFetch.toLocaleTimeString()}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {isConnected && (
+                      <button
+                        onClick={fetchLiveOpportunities}
+                        disabled={isLoadingOpportunities}
+                        className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        {isLoadingOpportunities ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            LOADING...
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={16} className="fill-current" />
+                            REFRESH DATA
+                          </>
+                        )}
+                      </button>
+                    )}
+                    
+                    <div className="flex items-center gap-4 bg-slate-900 p-2 rounded-[2rem] border border-slate-800 shadow-2xl">
+                      <div className="flex items-center gap-3 px-4">
+                        <Wallet className="text-blue-400" size={20} />
+                        <input 
+                          type="number"
+                          placeholder="Enter Initial Bankroll"
+                          className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-32 placeholder:text-slate-700"
+                          value={initialCapital}
+                          onChange={(e) => setInitialCapital(e.target.value)}
+                        />
+                      </div>
+                      <button 
+                        onClick={handleSetBankroll}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-xs font-black transition-all active:scale-95"
+                      >
+                        INITIALIZE
+                      </button>
+                    </div>
+                  </div>
+                </header>
+
+                {currentBankroll === 0 ? (
+                  <div className="py-32 flex flex-col items-center justify-center bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                      <Database className="text-slate-600" size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2">Blank Slate</h3>
+                    <p className="text-slate-500 text-center max-w-sm px-8 font-medium">
+                      Initialize your bankroll above to unlock Profit/Loss trends and live betting recommendations.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Current Bankroll</p>
+                        <h4 className="text-3xl font-black text-white">£{currentBankroll.toFixed(2)}</h4>
+                      </div>
+                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Total P/L</p>
+                        <h4 className={`text-3xl font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          £{stats.netProfit.toFixed(2)}
+                        </h4>
+                      </div>
+                      <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Win Rate</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <TrendingUp className="text-emerald-500" size={16} />
+                          <span className="text-2xl font-bold text-white">{stats.winRate}%</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">{stats.wonBets}/{stats.totalBets} wins</p>
+                      </div>
+                      <div className="bg-slate-900 p-8 rounded-[2rem] border-2 border-blue-500/30 shadow-2xl bg-gradient-to-br from-slate-900 to-blue-900/10">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Default Stake</p>
+                          <Calculator size={14} className="text-blue-400" />
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-2xl font-black text-slate-500 mr-1">£</span>
+                          <input 
+                            type="number"
+                            className="bg-transparent text-3xl font-black text-white w-full focus:outline-none"
+                            value={userStakeInput}
+                            onChange={(e) => setUserStakeInput(parseFloat(e.target.value) || 10)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pending Bets Section */}
+                    {placedBets.length > 0 && (
+                      <div className="mb-12">
+                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
+                          <CheckSquare size={16} className="text-amber-400" /> Pending Bets ({placedBets.length})
+                        </h3>
+                        <div className="grid gap-4">
+                          {placedBets.map(bet => (
+                            <div key={bet.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                              <div className="flex-1">
+                                <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
+                                <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
+                                <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
+                                  <span>Stake: <b className="text-white">£{bet.stake}</b></span>
+                                  <div className="flex items-center gap-2">
+                                    <span>Odds:</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={bet.odds}
+                                      onChange={(e) => handleUpdateOdds(bet.id, parseFloat(e.target.value))}
+                                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-20 text-white font-bold text-xs focus:outline-none focus:border-blue-500"
+                                    />
+                                  </div>
+                                  <span>Return: <b className="text-emerald-400">£{bet.potentialReturn}</b></span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleSettleBet(bet.id, true)}
+                                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                                >
+                                  WON
+                                </button>
+                                <button
+                                  onClick={() => handleSettleBet(bet.id, false)}
+                                  className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                                >
+                                  LOST
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mb-12">
+                      <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
+                        <Zap className="text-amber-400 fill-amber-400" size={16} /> 
+                        Live Recommendations ({opportunities.filter(o => o.confidence >= 80).length})
+                      </h3>
+                      
+                      {isLoadingOpportunities ? (
+                        <div className="text-center py-20">
+                          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                          <p className="text-slate-400 font-bold">Fetching live opportunities...</p>
+                        </div>
+                      ) : opportunities.length === 0 ? (
+                        <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
+                            <Zap className="text-slate-600" size={32} />
+                          </div>
+                          <h3 className="text-2xl font-black text-white mb-2">No Live Opportunities</h3>
+                          <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                            {isConnected 
+                              ? 'Click "REFRESH DATA" to fetch the latest opportunities from The Odds API.' 
+                              : 'Connect to Google Sheets to load live betting recommendations.'}
+                          </p>
+                          {isConnected && (
+                            <button
+                              onClick={fetchLiveOpportunities}
+                              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                            >
+                              REFRESH DATA NOW
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {/* Group opportunities by league */}
+                          {['Premier League', 'La Liga', 'Championship', 'League One', 'League Two', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
+                            const leagueOpps = opportunities
+                              .filter(opp => opp.confidence >= 80 && opp.league === league)
+                              .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
+                            
+                            if (leagueOpps.length === 0) return null;
+                            
+                            return (
+                              <div key={league} className="mb-12">
+                                <div className="flex items-center gap-3 mb-6">
+                                  <div className="h-px flex-1 bg-slate-800"></div>
+                                  <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                    {league} ({leagueOpps.length})
+                                  </h4>
+                                  <div className="h-px flex-1 bg-slate-800"></div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                  {leagueOpps.map(opp => (
+                                    <div key={opp.id} className={opp.isToday ? 'ring-2 ring-amber-500 rounded-3xl' : ''}>
+                                      {opp.isToday && (
+                                        <div className="bg-amber-500 text-slate-900 text-xs font-black px-4 py-2 rounded-t-3xl text-center uppercase tracking-wider">
+                                          ⚡ EVENT TODAY - {new Date(opp.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </div>
+                                      )}
+                                      <OpportunityCard opp={opp} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'setup' && (
+              <div className="max-w-4xl mx-auto animate-in slide-in-from-bottom-8 duration-700">
+                <header className="mb-12">
+                  <h2 className="text-4xl font-black text-white mb-4 tracking-tighter italic uppercase">Provisioning Engine</h2>
+                  <p className="text-slate-400 text-lg font-medium">Deploying the ABIS Backend to your Google Sheets environment.</p>
+                </header>
+
+                {/* Connection Status Card */}
+                <div className={`mb-12 p-6 rounded-3xl border-2 ${isConnected ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-amber-500/5 border-amber-500/30'}`}>
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-xl ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+                      <Database size={24} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-black text-white mb-2">
+                        {isConnected ? '✅ Google Sheets Connected' : '⚠️ Connect to Google Sheets'}
+                      </h3>
+                      <p className="text-sm text-slate-400 mb-4">
+                        {isConnected 
+                          ? `Connected and ready to sync. ${lastSyncTime ? `Last sync: ${lastSyncTime.toLocaleTimeString()}` : 'No syncs yet.'}`
+                          : 'Complete the setup below to enable real-time data synchronization.'
+                        }
+                      </p>
+                      {isConnected && (
+                        <button
+                          onClick={syncToSheets}
+                          disabled={isSyncing}
+                          className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all"
+                        >
+                          {isSyncing ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              SYNCING...
+                            </>
+                          ) : (
+                            <>
+                              <Database size={16} />
+                              SYNC NOW
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ))}
 
-              {/* PLACED BETS */}
-              {placedBets.length > 0 && (
-                <div className="bg-slate-900 rounded-3xl p-8">
-                  <h2 className="text-2xl font-black text-white mb-6">📋 ACTIVE BETS ({placedBets.length})</h2>
-                  <div className="space-y-3">
-                    {placedBets.map(bet => (
-                      <div key={bet.id} className="bg-slate-800 rounded-xl p-4 flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="text-white font-bold">{bet.event}</p>
-                          <p className="text-sm text-slate-400">{bet.selection} @ {bet.odds.toFixed(2)} - £{bet.stake}</p>
+                <div className="grid gap-12">
+                  <section className="relative pl-16">
+                    <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">1</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Create Environment</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                      Open a new <a href="https://sheets.new" target="_blank" rel="noopener noreferrer" className="text-blue-400 font-bold underline">Google Sheet</a> and name it <b>"ABIS UK Prod"</b>. 
+                      Navigate to <b>Extensions &gt; Apps Script</b>.
+                    </p>
+                  </section>
+
+                  <section className="relative pl-16">
+                    <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">2</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Inject Logic Layer</h3>
+                    <p className="text-slate-400 text-sm mb-4 leading-relaxed">
+                      Download the complete script file below. Your API keys will be stored <b>securely in Google Apps Script</b> (private server-side), 
+                      not in your public website code.
+                    </p>
+                    
+                    <div className="mb-6 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-amber-600 p-2 rounded-xl shrink-0">
+                          <Shield className="text-white" size={20} />
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => settleBet(bet.id, true)}
-                            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold"
-                          >
-                            WON
-                          </button>
-                          <button
-                            onClick={() => settleBet(bet.id, false)}
-                            className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold"
-                          >
-                            LOST
-                          </button>
+                        <div>
+                          <h4 className="text-sm font-black text-amber-400 mb-2 uppercase">Security Instructions</h4>
+                          <ol className="text-xs text-slate-300 space-y-2 leading-relaxed">
+                            <li><b>1.</b> Download the <code className="bg-slate-950 px-2 py-1 rounded text-blue-400">google-apps-script-webapp.js</code> file</li>
+                            <li><b>2.</b> Open it and replace the placeholder values:
+                              <ul className="ml-4 mt-1 space-y-1">
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_GEMINI_API_KEY_HERE</code></li>
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_ODDS_API_KEY_HERE</code></li>
+                                <li>• <code className="bg-slate-950 px-2 py-1 rounded">YOUR_GOOGLE_SHEET_ID_HERE</code></li>
+                              </ul>
+                            </li>
+                            <li><b>3.</b> Copy the entire script into Google Apps Script</li>
+                            <li><b>4.</b> Your keys stay private in Google's servers, never exposed in GitHub</li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="relative group rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+                      <div className="absolute right-6 top-6 z-10">
+                        <button 
+                          onClick={copyToClipboard}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 shadow-xl active:scale-95 transition-all"
+                        >
+                          {copySuccess ? <CheckCircle2 size={16}/> : <Copy size={16}/>}
+                          {copySuccess ? 'COPIED' : 'COPY BACKEND SCRIPT'}
+                        </button>
+                      </div>
+                      <pre className="bg-slate-950 p-10 pt-20 text-[11px] font-mono text-blue-300 overflow-x-auto max-h-[400px] scrollbar-hide">
+                        {generateScript()}
+                      </pre>
+                    </div>
+                  </section>
+
+                  <section className="relative pl-16">
+                    <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">3</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Finalize Provisioning</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                      Paste the code into the Apps Script editor, click <b>Save</b>, and <b>Refresh</b> your Google Sheet. 
+                      A new menu <b>🚀 ABIS System</b> will appear. Click it and select <b>Initialize Environment</b>.
+                    </p>
+                    <div className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-[2rem] flex items-center gap-4">
+                      <div className="bg-blue-600 p-2 rounded-xl"><Info size={20}/></div>
+                      <p className="text-xs text-blue-400 font-bold leading-relaxed italic">
+                        This builds the Config, Recommendations, Placed_Bets, and P&L history tabs automatically.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section className="relative pl-16">
+                    <div className="absolute left-0 top-0 w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">4</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Deploy Web App & Connect</h3>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                      In Apps Script, click <b>Deploy → New deployment → Select type: Web app</b>. 
+                      Set "Who has access" to <b>"Anyone"</b>, then click <b>Deploy</b>. 
+                      Copy the Web App URL and paste it below.
+                    </p>
+                    
+                    <div className="flex gap-3 mb-4">
+                      <input
+                        type="text"
+                        placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
+                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500"
+                        value={webAppUrl}
+                        onChange={(e) => setWebAppUrl(e.target.value)}
+                      />
+                      <button
+                        onClick={() => saveWebAppUrl(webAppUrl)}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black text-sm transition-all"
+                      >
+                        CONNECT
+                      </button>
+                    </div>
+
+                    {isConnected && (
+                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                        <CheckCircle2 className="text-emerald-500" size={20} />
+                        <span className="text-sm font-bold text-emerald-400">
+                          Connected! Your website and Google Sheets are now synced.
+                        </span>
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <div className="animate-in fade-in duration-500">
+                {settledBets.length === 0 ? (
+                  <div className="text-center py-40">
+                    <div className="p-6 bg-slate-900 rounded-full w-fit mx-auto mb-6">
+                      <History className="text-slate-700" size={40} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2 tracking-tight uppercase italic">No History Found</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium">
+                      Bet history will populate once you place and settle bets from the dashboard.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <header className="mb-8">
+                      <h2 className="text-3xl font-black text-white mb-2">Bet History</h2>
+                      <p className="text-slate-500">Complete record of all settled bets</p>
+                    </header>
+
+                    <div className="grid gap-4">
+                      {settledBets.map(bet => (
+                        <div key={bet.id} className={`bg-slate-900 border rounded-2xl p-6 ${bet.status === 'won' ? 'border-emerald-500/30' : 'border-red-500/30'}`}>
+                          <div className="flex flex-col md:flex-row justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${bet.status === 'won' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {bet.status.toUpperCase()}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  {new Date(bet.settledAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
+                              <p className="text-xs text-blue-400 font-bold mb-3">{bet.league} • {bet.selection}</p>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Stake</p>
+                                  <p className="text-white font-bold">£{bet.stake.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Odds</p>
+                                  <p className="text-white font-bold">{bet.odds}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Return</p>
+                                  <p className="text-white font-bold">£{bet.actualReturn.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Profit</p>
+                                  <p className={`font-bold ${bet.status === 'won' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    £{(bet.actualReturn - bet.stake).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'laliga' && (
+              <div className="animate-in fade-in duration-700">
+                <header className="flex justify-between items-center mb-12">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">La Liga</h2>
+                    <p className="text-slate-500 font-medium">All upcoming La Liga matches in the next 7 days with live odds comparison</p>
+                  </div>
+                  {isConnected && (
+                    <button
+                      onClick={fetchLaLigaMatches}
+                      disabled={isLoadingLaLiga}
+                      className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
+                    >
+                      {isLoadingLaLiga ? 'LOADING...' : 'REFRESH'}
+                    </button>
+                  )}
+                </header>
+
+                {isLoadingLaLiga ? (
+                  <div className="text-center py-20">
+                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold">Fetching La Liga matches...</p>
+                  </div>
+                ) : laLigaMatches.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
+                      <TrendingUp className="text-slate-600" size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2">No Upcoming Matches</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                      {isConnected 
+                        ? 'No La Liga matches scheduled in the next 7 days.' 
+                        : 'Connect to Google Sheets to load La Liga match data.'}
+                    </p>
+                    {isConnected && (
+                      <button
+                        onClick={fetchLaLigaMatches}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                      >
+                        REFRESH NOW
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid gap-8">
+                    {laLigaMatches.map(match => (
+                      <div key={match.id} className={`bg-slate-900 border rounded-3xl p-8 ${
+                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 
+                        match.isBigGame ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 
+                        'border-slate-800'
+                      }`}>
+                        {match.isElClasico && (
+                          <div className="bg-red-500 text-white text-sm font-black px-6 py-3 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
+                            ⚽ EL CLÁSICO - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </div>
+                        )}
+                        {!match.isElClasico && match.isBigGame && (
+                          <div className="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
+                            ⭐ Featured Match - {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </div>
+                        )}
+                        
+                        <h3 className="text-2xl font-black text-white mb-6">{match.event}</h3>
+                        {!match.isElClasico && (
+                          <p className="text-sm text-slate-400 mb-6">
+                            {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </p>
+                        )}
+                        
+                        <div className="grid gap-4">
+                          {match.odds.map((bookmaker, idx) => (
+                            <div key={idx} className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+                              <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-lg font-bold text-white">{bookmaker.bookie}</h4>
+                                <a href={bookmaker.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                                  Visit Site <ArrowUpRight size={12}/>
+                                </a>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4">
+                                <div className="text-center p-4 bg-slate-900 rounded-xl">
+                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.home_team}</p>
+                                  <p className="text-2xl font-black text-emerald-400">{bookmaker.homeOdds.toFixed(2)}</p>
+                                </div>
+                                <div className="text-center p-4 bg-slate-900 rounded-xl">
+                                  <p className="text-xs text-slate-500 mb-2 uppercase">Draw</p>
+                                  <p className="text-2xl font-black text-blue-400">{bookmaker.drawOdds.toFixed(2)}</p>
+                                </div>
+                                <div className="text-center p-4 bg-slate-900 rounded-xl">
+                                  <p className="text-xs text-slate-500 mb-2 uppercase">{match.away_team}</p>
+                                  <p className="text-2xl font-black text-amber-400">{bookmaker.awayOdds.toFixed(2)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* P&L HISTORY */}
-              {settledBets.length > 0 && (
-                <div className="bg-slate-900 rounded-3xl p-8">
-                  <h2 className="text-2xl font-black text-white mb-6">📊 BETTING HISTORY</h2>
-                  <div className="space-y-2">
-                    {settledBets.slice(-10).reverse().map((bet, idx) => {
-                      const profit = bet.won ? (bet.stake * bet.odds - bet.stake) : -bet.stake;
-                      return (
-                        <div key={idx} className="bg-slate-800 rounded-xl p-3 flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="text-white text-sm font-bold">{bet.event} - {bet.selection}</p>
-                            <p className="text-xs text-slate-400">£{bet.stake} @ {bet.odds.toFixed(2)}</p>
-                          </div>
-                          <p className={`font-black ${bet.won ? 'text-green-400' : 'text-red-400'}`}>
-                            {bet.won ? '+' : ''}£{profit.toFixed(2)}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {lastUpdate && (
-            <div className="max-w-7xl mx-auto mt-6 text-center text-slate-600 text-sm">
-              Last updated: {lastUpdate.toLocaleTimeString()}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </main>
         </div>
       );
     };
