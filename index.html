@@ -867,52 +867,53 @@ function onOpen() {
 
                 {/* Pending Bets Section */}
                 {placedBets.length > 0 && (
-                      <div className="mb-12">
-                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
-                          <CheckSquare size={16} className="text-amber-400" /> Pending Bets ({placedBets.length})
-                        </h3>
-                        <div className="grid gap-4">
-                          {placedBets.map(bet => (
-                            <div key={bet.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                              <div className="flex-1">
-                                <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
-                                <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
-                                <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
-                                  <span>Stake: <b className="text-white">£{bet.stake}</b></span>
-                                  <div className="flex items-center gap-2">
-                                    <span>Odds:</span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={bet.odds}
-                                      onChange={(e) => handleUpdateOdds(bet.id, parseFloat(e.target.value))}
-                                      className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-20 text-white font-bold text-xs focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
-                                  <span>Return: <b className="text-emerald-400">£{bet.potentialReturn}</b></span>
-                                </div>
+                  <div className="mb-12">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
+                      <CheckSquare size={16} className="text-amber-400" /> Pending Bets ({placedBets.length})
+                    </h3>
+                    <div className="grid gap-4">
+                      {placedBets.map(bet => (
+                        <div key={bet.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="flex-1">
+                            <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
+                            <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
+                            <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
+                              <span>Stake: <b className="text-white">£{bet.stake}</b></span>
+                              <div className="flex items-center gap-2">
+                                <span>Odds:</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={bet.odds}
+                                  onChange={(e) => handleUpdateOdds(bet.id, parseFloat(e.target.value))}
+                                  className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-20 text-white font-bold text-xs focus:outline-none focus:border-blue-500"
+                                />
                               </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleSettleBet(bet.id, true)}
-                                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
-                                >
-                                  WON
-                                </button>
-                                <button
-                                  onClick={() => handleSettleBet(bet.id, false)}
-                                  className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
-                                >
-                                  LOST
-                                </button>
-                              </div>
+                              <span>Return: <b className="text-emerald-400">£{bet.potentialReturn}</b></span>
                             </div>
-                          ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSettleBet(bet.id, true)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                            >
+                              WON
+                            </button>
+                            <button
+                              onClick={() => handleSettleBet(bet.id, false)}
+                              className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                            >
+                              LOST
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                    <div className="mb-12">
+                {/* Live Recommendations Section */}
+                <div className="mb-12">
                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
                         <Zap className="text-amber-400 fill-amber-400" size={16} /> 
                         Live Recommendations ({opportunities.length})
