@@ -89,6 +89,39 @@
     );
 
     // ============================================================================
+    // JSONP - Required for GitHub Pages (cross-origin); Google Script doesn't send CORS
+    // ============================================================================
+    const jsonp = (baseUrl, params = {}) => {
+      return new Promise((resolve, reject) => {
+        const cbName = '__abis_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+        const url = new URL(baseUrl);
+        url.searchParams.set('action', params.action || 'test');
+        url.searchParams.set('callback', cbName);
+        const script = document.createElement('script');
+        script.src = url.toString();
+        const cleanup = () => {
+          try { script.parentNode && script.parentNode.removeChild(script); } catch (_) {}
+          delete window[cbName];
+        };
+        const t = setTimeout(() => {
+          cleanup();
+          reject(new Error('Request timeout'));
+        }, 120000);
+        window[cbName] = (data) => {
+          clearTimeout(t);
+          cleanup();
+          resolve(data);
+        };
+        script.onerror = () => {
+          clearTimeout(t);
+          cleanup();
+          reject(new Error('Script load failed'));
+        };
+        document.body.appendChild(script);
+      });
+    };
+
+    // ============================================================================
     // MAIN APP
     // ============================================================================
     const App = () => {
@@ -107,7 +140,7 @@
       const [lastUpdate, setLastUpdate] = useState(null);
 
       // ========================================================================
-      // TEST CONNECTION
+      // TEST CONNECTION (uses JSONP so it works from GitHub Pages)
       // ========================================================================
       const testConnection = async (url) => {
         if (!url || url.trim() === '') {
@@ -121,19 +154,7 @@
 
         try {
           console.log('🔗 Testing connection to:', url);
-          
-          const response = await fetch(url + '?action=test', {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const data = await response.json();
+          const data = await jsonp(url, { action: 'test' });
           console.log('✅ Response:', data);
           
           if (data.status === 'ok') {
@@ -143,12 +164,12 @@
             console.log('✅ Connected to Google Sheets');
           } else {
             setIsConnected(false);
-            setConnectionMessage('❌ Invalid response from server');
+            setConnectionMessage(data.message || '❌ Invalid response from server');
           }
         } catch (error) {
           console.error('❌ Connection error:', error);
           setIsConnected(false);
-          setConnectionMessage(`❌ Connection failed: ${error.message}`);
+          setConnectionMessage(`❌ Connection failed: ${error.message}. Make sure the Web App is deployed as "Anyone" and URL is correct.`);
         } finally {
           setIsTesting(false);
         }
@@ -164,7 +185,7 @@
       }, []);
 
       // ========================================================================
-      // FETCH LIVE DATA
+      // FETCH LIVE DATA (JSONP so it works from GitHub Pages; backend uses Odds API + Gemini)
       // ========================================================================
       const fetchLiveOpportunities = async () => {
         if (!isConnected || !webAppUrl) {
@@ -174,28 +195,17 @@
 
         setIsLoadingDashboard(true);
         try {
-          console.log('📡 Fetching live opportunities...');
-          const response = await fetch(webAppUrl + '?action=getRecommendations', {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
+          console.log('📡 Fetching live opportunities (Odds API + Gemini)...');
+          const data = await jsonp(webAppUrl, { action: 'getRecommendations' });
           console.log('📊 Received data:', data);
           
-          if (data.status === 'ok' && data.recommendations) {
+          if (data.status === 'ok' && Array.isArray(data.recommendations)) {
             setLiveOpportunities(data.recommendations);
             setLastUpdate(new Date());
             console.log('✅ Loaded', data.recommendations.length, 'opportunities');
           } else {
             console.error('❌ Invalid response:', data);
-            alert('Failed to fetch data: Invalid response from server');
+            alert(data.message || 'Failed to fetch data: Invalid response from server');
           }
         } catch (error) {
           console.error('❌ Fetch error:', error);
@@ -213,28 +223,17 @@
 
         setIsLoadingRmBarca(true);
         try {
-          console.log('📡 Fetching RM & Barça matches...');
-          const response = await fetch(webAppUrl + '?action=getElClasico', {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
+          console.log('📡 Fetching RM & Barça matches (Odds API + Gemini)...');
+          const data = await jsonp(webAppUrl, { action: 'getElClasico' });
           console.log('📊 Received data:', data);
           
-          if (data.status === 'ok' && data.matches) {
+          if (data.status === 'ok' && Array.isArray(data.matches)) {
             setRmBarcaMatches(data.matches);
             setLastUpdate(new Date());
             console.log('✅ Loaded', data.matches.length, 'RM/Barça matches');
           } else {
             console.error('❌ Invalid response:', data);
-            alert('Failed to fetch data: Invalid response from server');
+            alert(data.message || 'Failed to fetch data: Invalid response from server');
           }
         } catch (error) {
           console.error('❌ Fetch error:', error);
@@ -459,7 +458,7 @@
                 <header className="flex justify-between items-center mb-8">
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight mb-2">Live Opportunities</h2>
-                    <p className="text-slate-500 font-medium">AI-powered betting intelligence from multiple sources</p>
+                    <p className="text-slate-500 font-medium">Odds API + Gemini AI — click REFRESH to fetch live games and predictions</p>
                   </div>
                   <button
                     onClick={fetchLiveOpportunities}
@@ -558,7 +557,7 @@
                 <header className="flex justify-between items-center mb-8">
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
-                    <p className="text-slate-500 font-medium">AI-powered score predictions for upcoming matches</p>
+                    <p className="text-slate-500 font-medium">Odds API + Gemini AI — click REFRESH to load RM/Barça matches and predictions</p>
                   </div>
                   <button
                     onClick={fetchRmBarca}
