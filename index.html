@@ -1387,45 +1387,47 @@ function onOpen() {
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {laLigaMatches.filter(m => m.isBigGame).map(match => {
-                          // Calculate most likely score based on odds
+                          // Use Gemini prediction if available, otherwise use odds-based estimate
                           const bestOdds = match.odds[0];
-                          let predictedScore = '';
-                          let confidence = 0;
-                          let reasoning = '';
+                          let predictedScore = match.predictedScore || '';
+                          let confidence = match.scoreConfidence || 0;
+                          let reasoning = match.reasoning || '';
                           
-                          // Simple prediction logic based on odds
-                          if (bestOdds.homeOdds < bestOdds.awayOdds && bestOdds.homeOdds < bestOdds.drawOdds) {
-                            if (bestOdds.homeOdds < 1.50) {
-                              predictedScore = '3-0';
-                              confidence = 78;
-                              reasoning = 'Heavy home favorite - dominant win likely';
-                            } else if (bestOdds.homeOdds < 2.00) {
-                              predictedScore = '2-1';
-                              confidence = 72;
-                              reasoning = 'Home advantage with competitive opposition';
+                          // If no Gemini prediction, use simple odds-based logic
+                          if (!predictedScore || predictedScore === 'N/A') {
+                            if (bestOdds.homeOdds < bestOdds.awayOdds && bestOdds.homeOdds < bestOdds.drawOdds) {
+                              if (bestOdds.homeOdds < 1.50) {
+                                predictedScore = '3-0';
+                                confidence = 65;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              } else if (bestOdds.homeOdds < 2.00) {
+                                predictedScore = '2-1';
+                                confidence = 62;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              } else {
+                                predictedScore = '2-0';
+                                confidence = 60;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              }
+                            } else if (bestOdds.awayOdds < bestOdds.homeOdds && bestOdds.awayOdds < bestOdds.drawOdds) {
+                              if (bestOdds.awayOdds < 1.50) {
+                                predictedScore = '0-3';
+                                confidence = 65;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              } else if (bestOdds.awayOdds < 2.00) {
+                                predictedScore = '1-2';
+                                confidence = 62;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              } else {
+                                predictedScore = '0-2';
+                                confidence = 60;
+                                reasoning = 'Odds-based estimate (awaiting AI analysis)';
+                              }
                             } else {
-                              predictedScore = '2-0';
-                              confidence = 68;
-                              reasoning = 'Narrow home win expected';
+                              predictedScore = '1-1';
+                              confidence = 58;
+                              reasoning = 'Odds-based estimate (awaiting AI analysis)';
                             }
-                          } else if (bestOdds.awayOdds < bestOdds.homeOdds && bestOdds.awayOdds < bestOdds.drawOdds) {
-                            if (bestOdds.awayOdds < 1.50) {
-                              predictedScore = '0-3';
-                              confidence = 78;
-                              reasoning = 'Heavy away favorite - dominant win likely';
-                            } else if (bestOdds.awayOdds < 2.00) {
-                              predictedScore = '1-2';
-                              confidence = 72;
-                              reasoning = 'Away strength despite home disadvantage';
-                            } else {
-                              predictedScore = '0-2';
-                              confidence = 68;
-                              reasoning = 'Away win expected';
-                            }
-                          } else {
-                            predictedScore = '1-1';
-                            confidence = 65;
-                            reasoning = 'Evenly matched - draw most likely';
                           }
                           
                           return (
