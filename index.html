@@ -26,15 +26,6 @@
     const { useState, useEffect } = React;
 
     // ============================================================================
-    // API CONFIGURATION - LIVE KEYS
-    // ============================================================================
-    const API_CONFIG = {
-      GEMINI_KEY: "AIzaSyAbPdVSto0JMUr7AkEDCd8j3MeTTjTVlJI",
-      ODDS_KEY: "0d7491630a8624fe87ea1da0dad2ea3f",
-      WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzdikJYwTZP6dQdRv6y8In6w0_iAmrihouWhD_22yXlS1YeUJyY-V1US5C3mW_M8H4A/exec"
-    };
-
-    // ============================================================================
     // ICONS
     // ============================================================================
     const Shield = ({size=24}) => (
@@ -46,12 +37,6 @@
     const TrendingUp = ({size=24}) => (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-      </svg>
-    );
-
-    const Zap = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
       </svg>
     );
 
@@ -85,104 +70,179 @@
       </svg>
     );
 
+    const CheckCircle = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    );
+
+    const AlertCircle = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    );
+
+    const Copy = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+    );
+
     // ============================================================================
     // MAIN APP
     // ============================================================================
     const App = () => {
-      const [activeTab, setActiveTab] = useState('dashboard');
+      const [activeTab, setActiveTab] = useState('provisioning');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [liveOpportunities, setLiveOpportunities] = useState([]);
       const [rmBarcaMatches, setRmBarcaMatches] = useState([]);
       const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
       const [isLoadingRmBarca, setIsLoadingRmBarca] = useState(false);
+      
+      // Provisioning state
+      const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem('abis_webapp_url') || '');
       const [isConnected, setIsConnected] = useState(false);
+      const [isTesting, setIsTesting] = useState(false);
+      const [connectionMessage, setConnectionMessage] = useState('');
       const [lastUpdate, setLastUpdate] = useState(null);
 
       // ========================================================================
-      // TEST CONNECTION ON MOUNT
+      // TEST CONNECTION
       // ========================================================================
-      useEffect(() => {
-        testConnection();
-      }, []);
+      const testConnection = async (url) => {
+        if (!url || url.trim() === '') {
+          setConnectionMessage('Please enter a Web App URL');
+          setIsConnected(false);
+          return;
+        }
 
-      const testConnection = async () => {
+        setIsTesting(true);
+        setConnectionMessage('Testing connection...');
+
         try {
-          console.log('🔗 Testing connection to Google Sheets...');
-          const response = await fetch(API_CONFIG.WEBAPP_URL + '?action=test', {
+          console.log('🔗 Testing connection to:', url);
+          
+          const response = await fetch(url + '?action=test', {
             method: 'GET',
-            mode: 'no-cors'
+            headers: {
+              'Accept': 'application/json',
+            }
           });
           
-          // With no-cors, we can't read the response, but if it doesn't throw, connection works
-          setIsConnected(true);
-          console.log('✅ Connected to Google Sheets');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log('✅ Response:', data);
+          
+          if (data.status === 'ok') {
+            setIsConnected(true);
+            setConnectionMessage('✅ Connected successfully! System ready.');
+            localStorage.setItem('abis_webapp_url', url);
+            console.log('✅ Connected to Google Sheets');
+          } else {
+            setIsConnected(false);
+            setConnectionMessage('❌ Invalid response from server');
+          }
         } catch (error) {
-          console.log('⚠️ Google Sheets connection failed, using direct API mode');
+          console.error('❌ Connection error:', error);
           setIsConnected(false);
+          setConnectionMessage(`❌ Connection failed: ${error.message}`);
+        } finally {
+          setIsTesting(false);
         }
       };
 
+      // Auto-test on mount if URL exists
+      useEffect(() => {
+        const savedUrl = localStorage.getItem('abis_webapp_url');
+        if (savedUrl) {
+          setWebAppUrl(savedUrl);
+          testConnection(savedUrl);
+        }
+      }, []);
+
       // ========================================================================
-      // FETCH LIVE DATA FROM GOOGLE SHEETS (calls Apps Script)
+      // FETCH LIVE DATA
       // ========================================================================
-      const fetchLiveOpportunitiesFromSheets = async () => {
+      const fetchLiveOpportunities = async () => {
+        if (!isConnected || !webAppUrl) {
+          alert('Please connect to Google Sheets first (go to Provisioning tab)');
+          return;
+        }
+
         setIsLoadingDashboard(true);
         try {
-          console.log('📡 Fetching live opportunities from Google Sheets...');
-          const response = await fetch(API_CONFIG.WEBAPP_URL + '?action=getRecommendations', {
-            method: 'GET'
+          console.log('📡 Fetching live opportunities...');
+          const response = await fetch(webAppUrl + '?action=getRecommendations', {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            }
           });
           
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
           const data = await response.json();
+          console.log('📊 Received data:', data);
           
           if (data.status === 'ok' && data.recommendations) {
             setLiveOpportunities(data.recommendations);
             setLastUpdate(new Date());
             console.log('✅ Loaded', data.recommendations.length, 'opportunities');
+          } else {
+            console.error('❌ Invalid response:', data);
+            alert('Failed to fetch data: Invalid response from server');
           }
         } catch (error) {
-          console.error('❌ Failed to fetch opportunities:', error);
+          console.error('❌ Fetch error:', error);
+          alert(`Failed to fetch opportunities: ${error.message}`);
         } finally {
           setIsLoadingDashboard(false);
         }
       };
 
-      const fetchRmBarcaFromSheets = async () => {
+      const fetchRmBarca = async () => {
+        if (!isConnected || !webAppUrl) {
+          alert('Please connect to Google Sheets first (go to Provisioning tab)');
+          return;
+        }
+
         setIsLoadingRmBarca(true);
         try {
-          console.log('📡 Fetching Real Madrid & Barcelona matches from Google Sheets...');
-          const response = await fetch(API_CONFIG.WEBAPP_URL + '?action=getElClasico', {
-            method: 'GET'
+          console.log('📡 Fetching RM & Barça matches...');
+          const response = await fetch(webAppUrl + '?action=getElClasico', {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            }
           });
           
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
           const data = await response.json();
+          console.log('📊 Received data:', data);
           
           if (data.status === 'ok' && data.matches) {
             setRmBarcaMatches(data.matches);
             setLastUpdate(new Date());
             console.log('✅ Loaded', data.matches.length, 'RM/Barça matches');
+          } else {
+            console.error('❌ Invalid response:', data);
+            alert('Failed to fetch data: Invalid response from server');
           }
         } catch (error) {
-          console.error('❌ Failed to fetch RM/Barça matches:', error);
+          console.error('❌ Fetch error:', error);
+          alert(`Failed to fetch matches: ${error.message}`);
         } finally {
           setIsLoadingRmBarca(false);
         }
       };
-
-      // ========================================================================
-      // AUTO-FETCH ON TAB CHANGE
-      // ========================================================================
-      useEffect(() => {
-        if (activeTab === 'dashboard' && liveOpportunities.length === 0) {
-          fetchLiveOpportunitiesFromSheets();
-        }
-      }, [activeTab]);
-
-      useEffect(() => {
-        if (activeTab === 'rmbarca' && rmBarcaMatches.length === 0) {
-          fetchRmBarcaFromSheets();
-        }
-      }, [activeTab]);
 
       // ========================================================================
       // RENDER
@@ -198,7 +258,7 @@
                 </div>
                 <div>
                   <h1 className="text-xl font-black text-white">ABIS LIVE</h1>
-                  <p className="text-xs text-slate-400 font-medium">Real-Time Intelligence v3.1</p>
+                  <p className="text-xs text-slate-400 font-medium">Real-Time Intelligence v3.2</p>
                 </div>
               </div>
 
@@ -226,8 +286,8 @@
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${
                   isConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
                 }`}>
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                  {isConnected ? 'LIVE' : 'OFFLINE'}
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                  {isConnected ? 'CONNECTED' : 'NOT CONNECTED'}
                 </div>
               </div>
 
@@ -261,6 +321,137 @@
           <main className="pt-28 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
             
             {/* ============================================================ */}
+            {/* PROVISIONING TAB */}
+            {/* ============================================================ */}
+            {activeTab === 'provisioning' && (
+              <div className="animate-in fade-in duration-700">
+                <header className="mb-8">
+                  <h2 className="text-3xl font-black text-white tracking-tight mb-2">System Provisioning</h2>
+                  <p className="text-slate-500 font-medium">Connect your Google Apps Script to enable live data</p>
+                </header>
+
+                <div className="bg-slate-900 border-2 border-blue-500/50 rounded-3xl p-8 mb-6">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="bg-blue-500 p-3 rounded-xl">
+                      <Database size={24} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-black text-white mb-2">Step 1: Deploy Your Web App</h3>
+                      <p className="text-slate-400 text-sm mb-4">
+                        In Google Apps Script, click <strong>Deploy → New deployment → Web app</strong>
+                      </p>
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-4">
+                        <p className="text-xs text-slate-400 mb-2">Settings:</p>
+                        <ul className="text-sm text-slate-300 space-y-1">
+                          <li>• <strong>Execute as:</strong> Me</li>
+                          <li>• <strong>Who has access:</strong> <span className="text-emerald-400 font-bold">Anyone</span></li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="bg-emerald-500 p-3 rounded-xl">
+                      <CheckCircle size={24} className="text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-black text-white mb-2">Step 2: Connect Your Web App</h3>
+                      <p className="text-slate-400 text-sm mb-4">
+                        Paste your Web App URL below and click <strong>TEST CONNECTION</strong>
+                      </p>
+                      
+                      <div className="mb-4">
+                        <input
+                          type="text"
+                          placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 mb-3"
+                          value={webAppUrl}
+                          onChange={(e) => setWebAppUrl(e.target.value)}
+                        />
+                        
+                        <button
+                          onClick={() => testConnection(webAppUrl)}
+                          disabled={isTesting || !webAppUrl}
+                          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2"
+                        >
+                          {isTesting ? (
+                            <>
+                              <RefreshCw size={16} className="animate-spin" />
+                              TESTING...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle size={16} />
+                              TEST CONNECTION
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {connectionMessage && (
+                        <div className={`p-4 rounded-xl border-2 ${
+                          isConnected 
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
+                            : 'bg-red-500/20 border-red-500/50 text-red-300'
+                        }`}>
+                          <p className="text-sm font-bold">{connectionMessage}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isConnected && (
+                  <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-3xl p-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <CheckCircle size={32} className="text-emerald-400" />
+                      <div>
+                        <h3 className="text-2xl font-black text-white">System Connected!</h3>
+                        <p className="text-emerald-400 text-sm font-medium">Your ABIS system is ready for live data</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
+                        <p className="text-xs text-slate-400 uppercase mb-2">Data Source</p>
+                        <p className="text-lg font-black text-white">The Odds API</p>
+                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">ACTIVE</span>
+                      </div>
+                      
+                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
+                        <p className="text-xs text-slate-400 uppercase mb-2">AI Engine</p>
+                        <p className="text-lg font-black text-white">Gemini AI</p>
+                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">ACTIVE</span>
+                      </div>
+                      
+                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
+                        <p className="text-xs text-slate-400 uppercase mb-2">Backend</p>
+                        <p className="text-lg font-black text-white">Google Sheets</p>
+                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">CONNECTED</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 bg-blue-500/20 border-2 border-blue-500/50 rounded-xl p-4">
+                      <p className="text-sm text-blue-300 font-bold">
+                        💡 <strong>Next Steps:</strong> Go to Dashboard or RM & Barça tab and click REFRESH to fetch live data!
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {!isConnected && !connectionMessage && (
+                  <div className="bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center">
+                    <AlertCircle className="text-slate-600 mx-auto mb-4" size={64} />
+                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
+                    <p className="text-slate-500 max-w-md mx-auto">
+                      Enter your Web App URL above and click TEST CONNECTION to enable live data fetching
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ============================================================ */}
             {/* DASHBOARD TAB */}
             {/* ============================================================ */}
             {activeTab === 'dashboard' && (
@@ -271,19 +462,34 @@
                     <p className="text-slate-500 font-medium">AI-powered betting intelligence from multiple sources</p>
                   </div>
                   <button
-                    onClick={fetchLiveOpportunitiesFromSheets}
-                    disabled={isLoadingDashboard}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
+                    onClick={fetchLiveOpportunities}
+                    disabled={isLoadingDashboard || !isConnected}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
                   >
                     <RefreshCw size={16} className={isLoadingDashboard ? 'animate-spin' : ''} />
                     {isLoadingDashboard ? 'LOADING...' : 'REFRESH'}
                   </button>
                 </header>
 
-                {isLoadingDashboard ? (
+                {!isConnected ? (
+                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <AlertCircle className="text-amber-500 mx-auto mb-6" size={64} />
+                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                      Please go to the Provisioning tab and connect your Google Apps Script first
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('provisioning')}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                    >
+                      GO TO PROVISIONING
+                    </button>
+                  </div>
+                ) : isLoadingDashboard ? (
                   <div className="text-center py-20">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-slate-400 font-bold">Fetching live data from APIs...</p>
+                    <p className="text-slate-600 text-sm mt-2">This may take 10-20 seconds</p>
                   </div>
                 ) : liveOpportunities.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
@@ -293,7 +499,7 @@
                       Click REFRESH to fetch live betting opportunities from The Odds API and Gemini AI
                     </p>
                     <button
-                      onClick={fetchLiveOpportunitiesFromSheets}
+                      onClick={fetchLiveOpportunities}
                       className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
                     >
                       FETCH LIVE DATA
@@ -331,7 +537,7 @@
                           </div>
                         </div>
 
-                        {opp.predictedScore && opp.predictedScore !== 'N/A' && (
+                        {opp.predictedScore && opp.predictedScore !== 'N/A' && opp.predictedScore !== '?-?' && (
                           <div className="mt-4 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-xl p-4 text-center">
                             <p className="text-xs text-emerald-400 font-black uppercase mb-1">AI Predicted Score</p>
                             <p className="text-3xl font-black text-white">{opp.predictedScore}</p>
@@ -355,19 +561,34 @@
                     <p className="text-slate-500 font-medium">AI-powered score predictions for upcoming matches</p>
                   </div>
                   <button
-                    onClick={fetchRmBarcaFromSheets}
-                    disabled={isLoadingRmBarca}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
+                    onClick={fetchRmBarca}
+                    disabled={isLoadingRmBarca || !isConnected}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
                   >
                     <RefreshCw size={16} className={isLoadingRmBarca ? 'animate-spin' : ''} />
                     {isLoadingRmBarca ? 'LOADING...' : 'REFRESH'}
                   </button>
                 </header>
 
-                {isLoadingRmBarca ? (
+                {!isConnected ? (
+                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <AlertCircle className="text-amber-500 mx-auto mb-6" size={64} />
+                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                      Please go to the Provisioning tab and connect your Google Apps Script first
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('provisioning')}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                    >
+                      GO TO PROVISIONING
+                    </button>
+                  </div>
+                ) : isLoadingRmBarca ? (
                   <div className="text-center py-20">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-slate-400 font-bold">Fetching predictions...</p>
+                    <p className="text-slate-600 text-sm mt-2">This may take 5-10 seconds</p>
                   </div>
                 ) : rmBarcaMatches.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
@@ -377,7 +598,7 @@
                       No Real Madrid or Barcelona matches in the next 7 days. Click REFRESH to check again.
                     </p>
                     <button
-                      onClick={fetchRmBarcaFromSheets}
+                      onClick={fetchRmBarca}
                       className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
                     >
                       FETCH LIVE DATA
@@ -436,69 +657,6 @@
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* ============================================================ */}
-            {/* PROVISIONING TAB */}
-            {/* ============================================================ */}
-            {activeTab === 'provisioning' && (
-              <div className="animate-in fade-in duration-700">
-                <header className="mb-8">
-                  <h2 className="text-3xl font-black text-white tracking-tight mb-2">System Provisioning</h2>
-                  <p className="text-slate-500 font-medium">Configure your ABIS intelligence system</p>
-                </header>
-
-                <div className="bg-slate-900 border-2 border-emerald-500/50 rounded-3xl p-8">
-                  <div className="flex items-start gap-4 mb-6">
-                    <div className="bg-emerald-500 p-3 rounded-xl">
-                      <Database size={24} className="text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-black text-white mb-2">✅ System Connected</h3>
-                      <p className="text-slate-400 text-sm mb-4">
-                        Your Google Apps Script is deployed and ready to fetch live data from:
-                      </p>
-                      <ul className="text-sm text-slate-400 space-y-2 mb-4">
-                        <li>• <span className="text-emerald-400 font-bold">The Odds API</span> - Live odds and match data</li>
-                        <li>• <span className="text-emerald-400 font-bold">Gemini AI</span> - Score predictions and analysis</li>
-                        <li>• <span className="text-emerald-400 font-bold">Google Sheets</span> - Data storage and sync</li>
-                      </ul>
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400 break-all">
-                        {API_CONFIG.WEBAPP_URL}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-500/20 border-2 border-blue-500/50 rounded-xl p-4">
-                    <p className="text-sm text-blue-300 font-bold">
-                      💡 <strong>Pro Tip:</strong> The system automatically fetches fresh data when you switch tabs. 
-                      Click REFRESH on any tab to get the latest live predictions!
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-8 bg-slate-900 border-2 border-slate-800 rounded-3xl p-8">
-                  <h3 className="text-xl font-black text-white mb-4">📊 API Status</h3>
-                  <div className="grid gap-4">
-                    <div className="flex items-center justify-between bg-slate-950 p-4 rounded-xl">
-                      <span className="text-sm font-bold text-slate-300">The Odds API</span>
-                      <span className="bg-emerald-500 text-white text-xs font-black px-3 py-1 rounded-full">ACTIVE</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-slate-950 p-4 rounded-xl">
-                      <span className="text-sm font-bold text-slate-300">Gemini AI</span>
-                      <span className="bg-emerald-500 text-white text-xs font-black px-3 py-1 rounded-full">ACTIVE</span>
-                    </div>
-                    <div className="flex items-center justify-between bg-slate-950 p-4 rounded-xl">
-                      <span className="text-sm font-bold text-slate-300">Google Sheets</span>
-                      <span className={`text-white text-xs font-black px-3 py-1 rounded-full ${
-                        isConnected ? 'bg-emerald-500' : 'bg-slate-700'
-                      }`}>
-                        {isConnected ? 'CONNECTED' : 'CHECKING...'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </main>
