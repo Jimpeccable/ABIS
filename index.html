@@ -3,17 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - Real Madrid & Barcelona Intelligence</title>
+  <title>ABIS UK Betting Intelligence - Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: 0; }
-    }
-    .animate-in { animation: fadeIn 0.7s ease-out; }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-  </style>
 </head>
 <body class="bg-slate-950 text-slate-200">
   <div id="root"></div>
@@ -26,97 +17,23 @@
     const { useState, useEffect } = React;
 
     // ============================================================================
-    // ICONS
-    // ============================================================================
-    const Shield = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      </svg>
-    );
-
-    const TrendingUp = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-      </svg>
-    );
-
-    const LayoutDashboard = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
-      </svg>
-    );
-
-    const Database = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-      </svg>
-    );
-
-    const Menu = () => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
-      </svg>
-    );
-
-    const X = () => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    );
-
-    const RefreshCw = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-      </svg>
-    );
-
-    const CheckCircle = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-      </svg>
-    );
-
-    const AlertCircle = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-    );
-
-    const Copy = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-      </svg>
-    );
-
-    // ============================================================================
-    // JSONP - Required for GitHub Pages (cross-origin); Google Script doesn't send CORS
+    // JSONP Helper for cross-origin Google Apps Script
     // ============================================================================
     const jsonp = (baseUrl, params = {}) => {
       return new Promise((resolve, reject) => {
-        const cbName = '__abis_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+        const cbName = '__abis_' + Math.random().toString(36).slice(2);
         const url = new URL(baseUrl);
         url.searchParams.set('action', params.action || 'test');
         url.searchParams.set('callback', cbName);
         const script = document.createElement('script');
         script.src = url.toString();
         const cleanup = () => {
-          try { script.parentNode && script.parentNode.removeChild(script); } catch (_) {}
+          try { script.parentNode?.removeChild(script); } catch (_) {}
           delete window[cbName];
         };
-        const t = setTimeout(() => {
-          cleanup();
-          reject(new Error('Request timeout'));
-        }, 120000);
-        window[cbName] = (data) => {
-          clearTimeout(t);
-          cleanup();
-          resolve(data);
-        };
-        script.onerror = () => {
-          clearTimeout(t);
-          cleanup();
-          reject(new Error('Script load failed'));
-        };
+        const t = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 60000);
+        window[cbName] = (data) => { clearTimeout(t); cleanup(); resolve(data); };
+        script.onerror = () => { clearTimeout(t); cleanup(); reject(new Error('Failed')); };
         document.body.appendChild(script);
       });
     };
@@ -125,605 +42,404 @@
     // MAIN APP
     // ============================================================================
     const App = () => {
-      const [activeTab, setActiveTab] = useState('provisioning');
-      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-      const [liveOpportunities, setLiveOpportunities] = useState([]);
-      const [rmBarcaMatches, setRmBarcaMatches] = useState([]);
-      const [fetchDebug, setFetchDebug] = useState(null);
-      const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
-      const [isLoadingRmBarca, setIsLoadingRmBarca] = useState(false);
-      
-      // Provisioning state
-      const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem('abis_webapp_url') || '');
+      // Connection state
+      const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem('abis_url') || '');
       const [isConnected, setIsConnected] = useState(false);
-      const [isTesting, setIsTesting] = useState(false);
-      const [connectionMessage, setConnectionMessage] = useState('');
+      
+      // Data state
+      const [allBets, setAllBets] = useState([]);
+      const [isLoading, setIsLoading] = useState(false);
       const [lastUpdate, setLastUpdate] = useState(null);
+      
+      // Settings
+      const [defaultStake, setDefaultStake] = useState(parseFloat(localStorage.getItem('defaultStake') || '10'));
+      
+      // Bet tracking
+      const [placedBets, setPlacedBets] = useState(JSON.parse(localStorage.getItem('placedBets') || '[]'));
+      const [settledBets, setSettledBets] = useState(JSON.parse(localStorage.getItem('settledBets') || '[]'));
 
-      // ========================================================================
-      // TEST CONNECTION (uses JSONP so it works from GitHub Pages)
-      // ========================================================================
-      const testConnection = async (url) => {
-        if (!url || url.trim() === '') {
-          setConnectionMessage('Please enter a Web App URL');
-          setIsConnected(false);
+      // Save settings to localStorage
+      useEffect(() => {
+        localStorage.setItem('defaultStake', defaultStake.toString());
+      }, [defaultStake]);
+
+      useEffect(() => {
+        localStorage.setItem('placedBets', JSON.stringify(placedBets));
+      }, [placedBets]);
+
+      useEffect(() => {
+        localStorage.setItem('settledBets', JSON.stringify(settledBets));
+      }, [settledBets]);
+
+      // Test connection
+      const testConnection = async () => {
+        if (!webAppUrl) {
+          alert('Please enter your Web App URL');
           return;
         }
-
-        setIsTesting(true);
-        setConnectionMessage('Testing connection...');
-
         try {
-          console.log('🔗 Testing connection to:', url);
-          const data = await jsonp(url, { action: 'test' });
-          console.log('✅ Response:', data);
-          
+          const data = await jsonp(webAppUrl, { action: 'test' });
           if (data.status === 'ok') {
             setIsConnected(true);
-            setConnectionMessage('✅ Connected successfully! System ready.');
-            localStorage.setItem('abis_webapp_url', url);
-            console.log('✅ Connected to Google Sheets');
+            localStorage.setItem('abis_url', webAppUrl);
+            alert('✅ Connected successfully!');
           } else {
-            setIsConnected(false);
-            setConnectionMessage(data.message || '❌ Invalid response from server');
+            alert('❌ Connection failed');
           }
         } catch (error) {
-          console.error('❌ Connection error:', error);
-          setIsConnected(false);
-          setConnectionMessage(`❌ Connection failed: ${error.message}. Make sure the Web App is deployed as "Anyone" and URL is correct.`);
-        } finally {
-          setIsTesting(false);
+          alert('❌ Error: ' + error.message);
         }
       };
 
-      // Auto-test on mount if URL exists
+      // Fetch live opportunities
+      const fetchData = async () => {
+        if (!isConnected) {
+          alert('Please connect first');
+          return;
+        }
+        setIsLoading(true);
+        try {
+          const data = await jsonp(webAppUrl, { action: 'getRecommendations' });
+          if (data.status === 'ok' && Array.isArray(data.recommendations)) {
+            setAllBets(data.recommendations);
+            setLastUpdate(new Date());
+          } else {
+            alert('Error fetching data');
+          }
+        } catch (error) {
+          alert('Fetch failed: ' + error.message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      // Auto-connect on mount
       useEffect(() => {
-        const savedUrl = localStorage.getItem('abis_webapp_url');
-        if (savedUrl) {
-          setWebAppUrl(savedUrl);
-          testConnection(savedUrl);
+        if (webAppUrl) {
+          jsonp(webAppUrl, { action: 'test' }).then(d => {
+            if (d.status === 'ok') setIsConnected(true);
+          }).catch(() => {});
         }
       }, []);
 
-      // ========================================================================
-      // FETCH LIVE DATA (JSONP so it works from GitHub Pages; backend uses Odds API + Gemini)
-      // ========================================================================
-      const fetchLiveOpportunities = async () => {
-        if (!isConnected || !webAppUrl) {
-          alert('Please connect to Google Sheets first (go to Provisioning tab)');
-          return;
-        }
+      // Calculate P&L
+      const totalStaked = settledBets.reduce((sum, bet) => sum + bet.stake, 0);
+      const totalReturns = settledBets.reduce((sum, bet) => sum + (bet.won ? bet.stake * bet.odds : 0), 0);
+      const profitLoss = totalReturns - totalStaked;
+      const roi = totalStaked > 0 ? ((profitLoss / totalStaked) * 100).toFixed(1) : 0;
 
-        setIsLoadingDashboard(true);
-        try {
-          console.log('📡 Fetching live opportunities (Odds API + Gemini)...');
-          const data = await jsonp(webAppUrl, { action: 'getRecommendations' });
-          console.log('📊 Received data:', data);
-          
-          if (data.status === 'ok' && Array.isArray(data.recommendations)) {
-            setLiveOpportunities(data.recommendations);
-            setFetchDebug(data.debug || null);
-            setLastUpdate(new Date());
-            console.log('✅ Loaded', data.recommendations.length, 'opportunities', data.debug ? '(debug: ' + JSON.stringify(data.debug) + ')' : '');
-          } else {
-            console.error('❌ Invalid response:', data);
-            alert(data.message || 'Failed to fetch data: Invalid response from server');
-          }
-        } catch (error) {
-          console.error('❌ Fetch error:', error);
-          alert(`Failed to fetch opportunities: ${error.message}`);
-        } finally {
-          setIsLoadingDashboard(false);
+      // Group by league
+      const byLeague = {};
+      allBets.forEach(bet => {
+        if (!byLeague[bet.league]) byLeague[bet.league] = [];
+        byLeague[bet.league].push(bet);
+      });
+
+      // Top 3 bets
+      const top3 = [...allBets].sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+
+      // Today's games
+      const today = new Date().toDateString();
+      const todayGames = allBets.filter(bet => new Date(bet.commence_time).toDateString() === today);
+
+      // Best accumulator (top 3 highest confidence)
+      const accumulator = top3.length === 3 ? {
+        bets: top3,
+        combinedOdds: top3.reduce((acc, bet) => acc * bet.odds, 1).toFixed(2),
+        potential: (defaultStake * top3.reduce((acc, bet) => acc * bet.odds, 1)).toFixed(2)
+      } : null;
+
+      // Place bet
+      const placeBet = (bet, stake = defaultStake) => {
+        const newBet = {
+          id: Date.now(),
+          ...bet,
+          stake,
+          placedAt: new Date().toISOString()
+        };
+        setPlacedBets([...placedBets, newBet]);
+      };
+
+      // Settle bet
+      const settleBet = (betId, won) => {
+        const bet = placedBets.find(b => b.id === betId);
+        if (bet) {
+          setSettledBets([...settledBets, { ...bet, won, settledAt: new Date().toISOString() }]);
+          setPlacedBets(placedBets.filter(b => b.id !== betId));
         }
       };
 
-      const fetchRmBarca = async () => {
-        if (!isConnected || !webAppUrl) {
-          alert('Please connect to Google Sheets first (go to Provisioning tab)');
-          return;
-        }
-
-        setIsLoadingRmBarca(true);
-        try {
-          console.log('📡 Fetching RM & Barça matches (Odds API + Gemini)...');
-          const data = await jsonp(webAppUrl, { action: 'getElClasico' });
-          console.log('📊 Received data:', data);
-          
-          if (data.status === 'ok' && Array.isArray(data.matches)) {
-            setRmBarcaMatches(data.matches);
-            setLastUpdate(new Date());
-            console.log('✅ Loaded', data.matches.length, 'RM/Barça matches');
-          } else {
-            console.error('❌ Invalid response:', data);
-            alert(data.message || 'Failed to fetch data: Invalid response from server');
-          }
-        } catch (error) {
-          console.error('❌ Fetch error:', error);
-          alert(`Failed to fetch matches: ${error.message}`);
-        } finally {
-          setIsLoadingRmBarca(false);
-        }
-      };
-
-      // ========================================================================
-      // RENDER
-      // ========================================================================
       return (
-        <div className="min-h-screen">
+        <div className="min-h-screen p-6">
           {/* Header */}
-          <header className="fixed top-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 z-50">
-            <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-xl">
-                  <Shield size={24} className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-black text-white">ABIS LIVE</h1>
-                  <p className="text-xs text-slate-400 font-medium">Real-Time Intelligence v3.2</p>
-                </div>
-              </div>
-
-              {/* Desktop Nav */}
-              <div className="hidden lg:flex items-center gap-2">
-                {[
-                  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-                  { id: 'rmbarca', label: 'RM & Barça', icon: TrendingUp },
-                  { id: 'provisioning', label: 'Provisioning', icon: Database }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${
-                      activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    <tab.icon size={16} /> {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Status */}
-              <div className="hidden lg:flex items-center gap-3">
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${
-                  isConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                  {isConnected ? 'CONNECTED' : 'NOT CONNECTED'}
-                </div>
-              </div>
-
-              {/* Mobile Menu Button */}
-              <button
-                className="lg:hidden"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                {isMobileMenuOpen ? <X /> : <Menu />}
-              </button>
+          <div className="max-w-7xl mx-auto mb-8">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl p-8 mb-6">
+              <h1 className="text-4xl font-black text-white mb-2">ABIS UK BETTING INTELLIGENCE</h1>
+              <p className="text-blue-100">Live odds analysis across all UK football leagues</p>
             </div>
-          </header>
 
-          {/* Mobile Menu */}
-          {isMobileMenuOpen && (
-            <div className="fixed inset-0 top-20 bg-slate-950 z-40 p-6 flex flex-col gap-4 lg:hidden">
-              {['dashboard', 'rmbarca', 'provisioning'].map(id => (
+            {/* Connection */}
+            {!isConnected && (
+              <div className="bg-slate-900 rounded-2xl p-6 mb-6">
+                <h2 className="text-xl font-bold mb-4">Connect to Your Backend</h2>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={webAppUrl}
+                    onChange={(e) => setWebAppUrl(e.target.value)}
+                    placeholder="Enter your Google Apps Script Web App URL"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
+                  />
+                  <button
+                    onClick={testConnection}
+                    className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold"
+                  >
+                    CONNECT
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Controls */}
+            {isConnected && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-slate-900 rounded-2xl p-6">
+                  <label className="text-sm text-slate-400 block mb-2">Default Stake (£)</label>
+                  <input
+                    type="number"
+                    value={defaultStake}
+                    onChange={(e) => setDefaultStake(parseFloat(e.target.value) || 10)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-2xl font-bold"
+                  />
+                </div>
+                
+                <div className="bg-slate-900 rounded-2xl p-6">
+                  <p className="text-sm text-slate-400 mb-2">Profit/Loss</p>
+                  <p className={`text-3xl font-black ${profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    £{profitLoss.toFixed(2)}
+                  </p>
+                  <p className="text-sm text-slate-500">ROI: {roi}%</p>
+                </div>
+                
                 <button
-                  key={id}
-                  onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
-                  className={`w-full p-4 rounded-2xl text-left font-bold capitalize ${
-                    activeTab === id ? 'bg-blue-600' : 'bg-slate-900'
-                  }`}
+                  onClick={fetchData}
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 rounded-2xl p-6 font-bold text-xl"
                 >
-                  {id === 'rmbarca' ? 'RM & Barça' : id}
+                  {isLoading ? '⏳ LOADING...' : '🔄 REFRESH DATA'}
                 </button>
+              </div>
+            )}
+          </div>
+
+          {!isConnected ? (
+            <div className="max-w-7xl mx-auto text-center py-20">
+              <p className="text-2xl text-slate-600">Connect to your backend to see live betting opportunities</p>
+            </div>
+          ) : allBets.length === 0 ? (
+            <div className="max-w-7xl mx-auto text-center py-20">
+              <p className="text-2xl text-slate-600">Click REFRESH DATA to load opportunities</p>
+            </div>
+          ) : (
+            <div className="max-w-7xl mx-auto grid gap-6">
+              
+              {/* TOP 3 BETS */}
+              <div className="bg-gradient-to-r from-emerald-600 to-green-600 rounded-3xl p-8">
+                <h2 className="text-3xl font-black text-white mb-6">🏆 TOP 3 BETS</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {top3.map((bet, idx) => (
+                    <div key={idx} className="bg-white/10 backdrop-blur rounded-2xl p-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-4xl font-black text-white">#{idx + 1}</span>
+                        <span className="bg-white text-emerald-600 px-3 py-1 rounded-full text-sm font-black">
+                          {bet.confidence}%
+                        </span>
+                      </div>
+                      <p className="text-white font-bold text-lg mb-2">{bet.event}</p>
+                      <p className="text-emerald-100 text-sm mb-3">{bet.league}</p>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-emerald-100 text-xs">Selection</p>
+                          <p className="text-white font-black">{bet.selection}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-emerald-100 text-xs">Odds</p>
+                          <p className="text-white font-black text-xl">{bet.odds.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => placeBet(bet)}
+                        className="w-full bg-white text-emerald-600 font-black py-3 rounded-xl hover:bg-emerald-50"
+                      >
+                        PLACE £{defaultStake} BET
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ACCUMULATOR */}
+              {accumulator && (
+                <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl p-8">
+                  <h2 className="text-3xl font-black text-white mb-4">🎯 SUGGESTED ACCUMULATOR</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-purple-100 text-sm mb-3">Combined Odds: <span className="text-white font-black text-2xl">{accumulator.combinedOdds}</span></p>
+                      <p className="text-purple-100 text-sm mb-4">Potential Return: <span className="text-white font-black text-2xl">£{accumulator.potential}</span></p>
+                      <div className="space-y-2">
+                        {accumulator.bets.map((bet, idx) => (
+                          <div key={idx} className="bg-white/10 rounded-xl p-3">
+                            <p className="text-white font-bold text-sm">{bet.event}</p>
+                            <p className="text-purple-100 text-xs">{bet.selection} @ {bet.odds.toFixed(2)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center">
+                      <button
+                        onClick={() => {
+                          const accBet = {
+                            event: 'Accumulator (3-fold)',
+                            selection: accumulator.bets.map(b => b.selection).join(' + '),
+                            odds: parseFloat(accumulator.combinedOdds),
+                            league: 'Multi',
+                            confidence: Math.round(accumulator.bets.reduce((sum, b) => sum + b.confidence, 0) / 3)
+                          };
+                          placeBet(accBet);
+                        }}
+                        className="bg-white text-purple-600 font-black px-12 py-6 rounded-2xl text-xl hover:bg-purple-50"
+                      >
+                        PLACE ACCA<br/>£{defaultStake}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TODAY'S GAMES */}
+              {todayGames.length > 0 && (
+                <div className="bg-slate-900 rounded-3xl p-8">
+                  <h2 className="text-3xl font-black text-white mb-6">⚡ PLAYING TODAY ({todayGames.length})</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {todayGames.map((bet, idx) => (
+                      <div key={idx} className="bg-amber-500/20 border-2 border-amber-500 rounded-2xl p-4">
+                        <span className="bg-amber-500 text-black px-2 py-1 rounded-full text-xs font-black">TODAY</span>
+                        <p className="text-white font-bold mt-2">{bet.event}</p>
+                        <p className="text-slate-400 text-sm">{bet.selection} @ {bet.odds.toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ALL LEAGUES */}
+              {Object.keys(byLeague).map(league => (
+                <div key={league} className="bg-slate-900 rounded-3xl p-8">
+                  <h2 className="text-2xl font-black text-white mb-6">{league}</h2>
+                  <div className="grid gap-4">
+                    {byLeague[league].map((bet, idx) => {
+                      const isToday = new Date(bet.commence_time).toDateString() === today;
+                      return (
+                        <div key={idx} className={`bg-slate-800 rounded-2xl p-6 border-2 ${isToday ? 'border-amber-500' : 'border-transparent'}`}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              {isToday && <span className="bg-amber-500 text-black px-2 py-1 rounded-full text-xs font-black mr-2">TODAY</span>}
+                              <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black">{bet.confidence}%</span>
+                              <h3 className="text-xl font-bold text-white mt-3">{bet.event}</h3>
+                              <p className="text-sm text-slate-400 mt-2">{bet.reasoning}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl">
+                            <div>
+                              <p className="text-xs text-slate-500">Selection</p>
+                              <p className="text-emerald-400 font-bold">{bet.selection}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Odds</p>
+                              <p className="text-blue-400 font-bold text-lg">{bet.odds.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Predicted</p>
+                              <p className="text-white font-bold">{bet.predictedScore}</p>
+                            </div>
+                            <div>
+                              <button
+                                onClick={() => placeBet(bet)}
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg"
+                              >
+                                BET £{defaultStake}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
+
+              {/* PLACED BETS */}
+              {placedBets.length > 0 && (
+                <div className="bg-slate-900 rounded-3xl p-8">
+                  <h2 className="text-2xl font-black text-white mb-6">📋 ACTIVE BETS ({placedBets.length})</h2>
+                  <div className="space-y-3">
+                    {placedBets.map(bet => (
+                      <div key={bet.id} className="bg-slate-800 rounded-xl p-4 flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-white font-bold">{bet.event}</p>
+                          <p className="text-sm text-slate-400">{bet.selection} @ {bet.odds.toFixed(2)} - £{bet.stake}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => settleBet(bet.id, true)}
+                            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-bold"
+                          >
+                            WON
+                          </button>
+                          <button
+                            onClick={() => settleBet(bet.id, false)}
+                            className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold"
+                          >
+                            LOST
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* P&L HISTORY */}
+              {settledBets.length > 0 && (
+                <div className="bg-slate-900 rounded-3xl p-8">
+                  <h2 className="text-2xl font-black text-white mb-6">📊 BETTING HISTORY</h2>
+                  <div className="space-y-2">
+                    {settledBets.slice(-10).reverse().map((bet, idx) => {
+                      const profit = bet.won ? (bet.stake * bet.odds - bet.stake) : -bet.stake;
+                      return (
+                        <div key={idx} className="bg-slate-800 rounded-xl p-3 flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-white text-sm font-bold">{bet.event} - {bet.selection}</p>
+                            <p className="text-xs text-slate-400">£{bet.stake} @ {bet.odds.toFixed(2)}</p>
+                          </div>
+                          <p className={`font-black ${bet.won ? 'text-green-400' : 'text-red-400'}`}>
+                            {bet.won ? '+' : ''}£{profit.toFixed(2)}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
-          <main className="pt-28 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
-            
-            {/* ============================================================ */}
-            {/* PROVISIONING TAB */}
-            {/* ============================================================ */}
-            {activeTab === 'provisioning' && (
-              <div className="animate-in fade-in duration-700">
-                <header className="mb-8">
-                  <h2 className="text-3xl font-black text-white tracking-tight mb-2">System Provisioning</h2>
-                  <p className="text-slate-500 font-medium">Connect your Google Apps Script to enable live data</p>
-                </header>
-
-                <div className="bg-slate-900 border-2 border-blue-500/50 rounded-3xl p-8 mb-6">
-                  <div className="flex items-start gap-4 mb-6">
-                    <div className="bg-blue-500 p-3 rounded-xl">
-                      <Database size={24} className="text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-black text-white mb-2">Step 1: Deploy Your Web App</h3>
-                      <p className="text-slate-400 text-sm mb-4">
-                        In Google Apps Script, click <strong>Deploy → New deployment → Web app</strong>
-                      </p>
-                      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-4">
-                        <p className="text-xs text-slate-400 mb-2">Settings:</p>
-                        <ul className="text-sm text-slate-300 space-y-1">
-                          <li>• <strong>Execute as:</strong> Me</li>
-                          <li>• <strong>Who has access:</strong> <span className="text-emerald-400 font-bold">Anyone</span></li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="bg-emerald-500 p-3 rounded-xl">
-                      <CheckCircle size={24} className="text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-black text-white mb-2">Step 2: Connect Your Web App</h3>
-                      <p className="text-slate-400 text-sm mb-4">
-                        Paste your Web App URL below and click <strong>TEST CONNECTION</strong>
-                      </p>
-                      
-                      <div className="mb-4">
-                        <input
-                          type="text"
-                          placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 mb-3"
-                          value={webAppUrl}
-                          onChange={(e) => setWebAppUrl(e.target.value)}
-                        />
-                        
-                        <button
-                          onClick={() => testConnection(webAppUrl)}
-                          disabled={isTesting || !webAppUrl}
-                          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2"
-                        >
-                          {isTesting ? (
-                            <>
-                              <RefreshCw size={16} className="animate-spin" />
-                              TESTING...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle size={16} />
-                              TEST CONNECTION
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {connectionMessage && (
-                        <div className={`p-4 rounded-xl border-2 ${
-                          isConnected 
-                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
-                            : 'bg-red-500/20 border-red-500/50 text-red-300'
-                        }`}>
-                          <p className="text-sm font-bold">{connectionMessage}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {isConnected && (
-                  <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-3xl p-8">
-                    <div className="flex items-center gap-3 mb-4">
-                      <CheckCircle size={32} className="text-emerald-400" />
-                      <div>
-                        <h3 className="text-2xl font-black text-white">System Connected!</h3>
-                        <p className="text-emerald-400 text-sm font-medium">Your ABIS system is ready for live data</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
-                        <p className="text-xs text-slate-400 uppercase mb-2">Data Source</p>
-                        <p className="text-lg font-black text-white">The Odds API</p>
-                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">ACTIVE</span>
-                      </div>
-                      
-                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
-                        <p className="text-xs text-slate-400 uppercase mb-2">AI Engine</p>
-                        <p className="text-lg font-black text-white">Gemini AI</p>
-                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">ACTIVE</span>
-                      </div>
-                      
-                      <div className="bg-slate-900/50 border border-emerald-500/30 rounded-xl p-4">
-                        <p className="text-xs text-slate-400 uppercase mb-2">Backend</p>
-                        <p className="text-lg font-black text-white">Google Sheets</p>
-                        <span className="bg-emerald-500 text-white text-xs font-black px-2 py-1 rounded-full mt-2 inline-block">CONNECTED</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 bg-blue-500/20 border-2 border-blue-500/50 rounded-xl p-4">
-                      <p className="text-sm text-blue-300 font-bold">
-                        💡 <strong>Next Steps:</strong> Go to Dashboard or RM & Barça tab and click REFRESH to fetch live data!
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {!isConnected && !connectionMessage && (
-                  <div className="bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center">
-                    <AlertCircle className="text-slate-600 mx-auto mb-4" size={64} />
-                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
-                    <p className="text-slate-500 max-w-md mx-auto">
-                      Enter your Web App URL above and click TEST CONNECTION to enable live data fetching
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ============================================================ */}
-            {/* DASHBOARD TAB */}
-            {/* ============================================================ */}
-            {activeTab === 'dashboard' && (
-              <div className="animate-in fade-in duration-700">
-                <header className="flex justify-between items-center mb-8">
-                  <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Live Opportunities</h2>
-                    <p className="text-slate-500 font-medium">Odds API + Gemini AI — click REFRESH to fetch live games and predictions</p>
-                  </div>
-                  <button
-                    onClick={fetchLiveOpportunities}
-                    disabled={isLoadingDashboard || !isConnected}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
-                  >
-                    <RefreshCw size={16} className={isLoadingDashboard ? 'animate-spin' : ''} />
-                    {isLoadingDashboard ? 'LOADING...' : 'REFRESH'}
-                  </button>
-                </header>
-
-                {!isConnected ? (
-                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                    <AlertCircle className="text-amber-500 mx-auto mb-6" size={64} />
-                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
-                      Please go to the Provisioning tab and connect your Google Apps Script first
-                    </p>
-                    <button
-                      onClick={() => setActiveTab('provisioning')}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                    >
-                      GO TO PROVISIONING
-                    </button>
-                  </div>
-                ) : isLoadingDashboard ? (
-                  <div className="text-center py-20">
-                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">Fetching live data from APIs...</p>
-                    <p className="text-slate-600 text-sm mt-2">This may take 10-20 seconds</p>
-                  </div>
-                ) : liveOpportunities.length === 0 ? (
-                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                    <TrendingUp className="text-slate-600 mx-auto mb-6" size={64} />
-                    <h3 className="text-2xl font-black text-white mb-2">No Opportunities Yet</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
-                      Click REFRESH to fetch live betting opportunities from The Odds API and Gemini AI
-                    </p>
-                    {fetchDebug && (
-                      <div className="max-w-md mx-auto mb-6 p-4 bg-slate-950 border border-slate-700 rounded-xl text-left text-sm">
-                        <p className="text-amber-400 font-bold mb-2">Why 0? Pipeline (after last REFRESH):</p>
-                        <p className="text-slate-400">Events from API (per league): {fetchDebug.eventsPerSport && Object.keys(fetchDebug.eventsPerSport).length ? Object.entries(fetchDebug.eventsPerSport).map(([k, v]) => k.replace('soccer_', '') + ': ' + v).join(', ') : '0'}</p>
-                        <p className="text-slate-400">In 2-day window: {fetchDebug.inWindow ?? '—'}</p>
-                        <p className="text-slate-400">With bookmakers: {fetchDebug.withBookmakers ?? '—'}</p>
-                        <p className="text-slate-400">Sent to Gemini: {fetchDebug.geminiCalled ?? '—'}</p>
-                        <p className="text-slate-400">Approved (≥70%): {fetchDebug.geminiApproved ?? '—'}</p>
-                        {(fetchDebug.geminiErrors && fetchDebug.geminiErrors.length > 0) && (
-                          <p className="text-amber-400 mt-2 font-bold">First Gemini failure: {fetchDebug.geminiErrors[0]}</p>
-                        )}
-                        {(fetchDebug.errors && fetchDebug.errors.length > 0) && (
-                          <p className="text-red-400 mt-2">Errors: {fetchDebug.errors.join('; ')}</p>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-3 justify-center">
-                      <button
-                        onClick={fetchLiveOpportunities}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                      >
-                        FETCH LIVE DATA
-                      </button>
-                      {webAppUrl && (
-                        <>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const d = await jsonp(webAppUrl, { action: 'diagnostics' });
-                                if (d.status === 'ok') {
-                                  const msg = `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`;
-                                  alert(msg);
-                                } else {
-                                  const msg = (d.message || '').toLowerCase().includes('unknown action')
-                                    ? 'CHECK ODDS API needs a newer Web App.\n\nRedeploy: In Google Apps Script open Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy. Then try again.'
-                                    : 'Diagnostics error: ' + (d.message || 'unknown');
-                                  alert(msg);
-                                }
-                              } catch (e) {
-                                alert('Diagnostics failed: ' + e.message);
-                              }
-                            }}
-                            className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
-                          >
-                            CHECK ODDS API
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const d = await jsonp(webAppUrl, { action: 'testGemini' });
-                                if (d.status === 'ok') {
-                                  const msg = d.httpCode !== 200
-                                    ? `Gemini: ${d.error || 'HTTP ' + d.httpCode}`
-                                    : `Gemini: HTTP ${d.httpCode}\nHas candidates: ${d.hasCandidates}\nHas text: ${d.hasText}\nParse OK: ${d.parseOk}\n${d.blockReason ? 'Block reason: ' + d.blockReason : ''}\n${d.rawSnippet ? 'Snippet: ' + d.rawSnippet : ''}`;
-                                  alert(msg);
-                                } else {
-                                  alert('Gemini test error: ' + (d.error || d.message || 'unknown'));
-                                }
-                              } catch (e) {
-                                alert('Test failed: ' + e.message);
-                              }
-                            }}
-                            className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
-                          >
-                            TEST GEMINI
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-6">
-                    {liveOpportunities.map((opp, idx) => (
-                      <div key={idx} className="bg-slate-900 border-2 border-blue-500/30 rounded-3xl p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-full uppercase">
-                                {opp.confidence}% CONFIDENCE
-                              </span>
-                              <span className="text-xs text-slate-500 uppercase font-bold">{opp.league}</span>
-                            </div>
-                            <h3 className="text-xl font-black text-white mb-2">{opp.event}</h3>
-                            <p className="text-sm text-slate-400">{opp.reasoning}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-4 bg-slate-950 p-4 rounded-2xl">
-                          <div>
-                            <p className="text-xs text-slate-500 uppercase mb-1">Selection</p>
-                            <p className="text-lg font-black text-emerald-400">{opp.selection}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-500 uppercase mb-1">Odds</p>
-                            <p className="text-lg font-black text-blue-400">{opp.odds.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-slate-500 uppercase mb-1">Bookmaker</p>
-                            <p className="text-sm font-bold text-white">{opp.bookie}</p>
-                          </div>
-                        </div>
-
-                        {opp.predictedScore && opp.predictedScore !== 'N/A' && opp.predictedScore !== '?-?' && (
-                          <div className="mt-4 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-xl p-4 text-center">
-                            <p className="text-xs text-emerald-400 font-black uppercase mb-1">AI Predicted Score</p>
-                            <p className="text-3xl font-black text-white">{opp.predictedScore}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ============================================================ */}
-            {/* REAL MADRID & BARCELONA TAB */}
-            {/* ============================================================ */}
-            {activeTab === 'rmbarca' && (
-              <div className="animate-in fade-in duration-700">
-                <header className="flex justify-between items-center mb-8">
-                  <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
-                    <p className="text-slate-500 font-medium">Odds API + Gemini AI — click REFRESH to load RM/Barça matches and predictions</p>
-                  </div>
-                  <button
-                    onClick={fetchRmBarca}
-                    disabled={isLoadingRmBarca || !isConnected}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
-                  >
-                    <RefreshCw size={16} className={isLoadingRmBarca ? 'animate-spin' : ''} />
-                    {isLoadingRmBarca ? 'LOADING...' : 'REFRESH'}
-                  </button>
-                </header>
-
-                {!isConnected ? (
-                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                    <AlertCircle className="text-amber-500 mx-auto mb-6" size={64} />
-                    <h3 className="text-2xl font-black text-white mb-2">Not Connected</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
-                      Please go to the Provisioning tab and connect your Google Apps Script first
-                    </p>
-                    <button
-                      onClick={() => setActiveTab('provisioning')}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                    >
-                      GO TO PROVISIONING
-                    </button>
-                  </div>
-                ) : isLoadingRmBarca ? (
-                  <div className="text-center py-20">
-                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">Fetching predictions...</p>
-                    <p className="text-slate-600 text-sm mt-2">This may take 5-10 seconds</p>
-                  </div>
-                ) : rmBarcaMatches.length === 0 ? (
-                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                    <TrendingUp className="text-slate-600 mx-auto mb-6" size={64} />
-                    <h3 className="text-2xl font-black text-white mb-2">No Upcoming Matches</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
-                      No Real Madrid or Barcelona matches in the next 7 days. Click REFRESH to check again.
-                    </p>
-                    <button
-                      onClick={fetchRmBarca}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                    >
-                      FETCH LIVE DATA
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid gap-8">
-                    {rmBarcaMatches.map(match => (
-                      <div key={match.id} className={`bg-slate-900 border-2 rounded-2xl p-6 ${
-                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 'border-blue-500/50'
-                      }`}>
-                        {match.isElClasico && (
-                          <div className="bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full w-fit mb-3 uppercase">
-                            ⚽ EL CLÁSICO
-                          </div>
-                        )}
-                        
-                        <h4 className="text-lg font-bold text-white mb-4">{match.event}</h4>
-                        
-                        <div className="flex items-center justify-center gap-4 mb-4">
-                          <div className="text-center">
-                            <p className="text-xs text-slate-500 mb-1 uppercase">Home</p>
-                            <p className="text-sm font-bold text-blue-400">{match.home_team.split(' ').slice(-1)[0]}</p>
-                          </div>
-                          
-                          <div className="text-center bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-xl px-6 py-3">
-                            <p className="text-xs text-emerald-400 font-black uppercase mb-1">AI Predicted Score</p>
-                            <p className="text-4xl font-black text-white">{match.predictedScore || '?-?'}</p>
-                          </div>
-                          
-                          <div className="text-center">
-                            <p className="text-xs text-slate-500 mb-1 uppercase">Away</p>
-                            <p className="text-sm font-bold text-amber-400">{match.away_team.split(' ').slice(-1)[0]}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-                          <div>
-                            <p className="text-xs text-slate-500 uppercase mb-1">Confidence</p>
-                            <p className="text-2xl font-black text-emerald-400">{match.scoreConfidence || 0}%</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-slate-500 uppercase mb-1">Kick-off</p>
-                            <p className="text-sm font-bold text-white">
-                              {new Date(match.commence_time).toLocaleDateString()} {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {match.reasoning && (
-                          <p className="text-xs text-slate-400 italic mt-3">
-                            {match.reasoning}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </main>
+          {lastUpdate && (
+            <div className="max-w-7xl mx-auto mt-6 text-center text-slate-600 text-sm">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </div>
+          )}
         </div>
       );
     };
