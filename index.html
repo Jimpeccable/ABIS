@@ -129,6 +129,7 @@
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [liveOpportunities, setLiveOpportunities] = useState([]);
       const [rmBarcaMatches, setRmBarcaMatches] = useState([]);
+      const [fetchDebug, setFetchDebug] = useState(null);
       const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
       const [isLoadingRmBarca, setIsLoadingRmBarca] = useState(false);
       
@@ -201,8 +202,9 @@
           
           if (data.status === 'ok' && Array.isArray(data.recommendations)) {
             setLiveOpportunities(data.recommendations);
+            setFetchDebug(data.debug || null);
             setLastUpdate(new Date());
-            console.log('✅ Loaded', data.recommendations.length, 'opportunities');
+            console.log('✅ Loaded', data.recommendations.length, 'opportunities', data.debug ? '(debug: ' + JSON.stringify(data.debug) + ')' : '');
           } else {
             console.error('❌ Invalid response:', data);
             alert(data.message || 'Failed to fetch data: Invalid response from server');
@@ -497,12 +499,45 @@
                     <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
                       Click REFRESH to fetch live betting opportunities from The Odds API and Gemini AI
                     </p>
-                    <button
-                      onClick={fetchLiveOpportunities}
-                      className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                    >
-                      FETCH LIVE DATA
-                    </button>
+                    {fetchDebug && (
+                      <div className="max-w-md mx-auto mb-6 p-4 bg-slate-950 border border-slate-700 rounded-xl text-left text-sm">
+                        <p className="text-amber-400 font-bold mb-2">Why 0? Pipeline (after last REFRESH):</p>
+                        <p className="text-slate-400">Events from API (per league): {fetchDebug.eventsPerSport && Object.keys(fetchDebug.eventsPerSport).length ? Object.entries(fetchDebug.eventsPerSport).map(([k, v]) => k.replace('soccer_', '') + ': ' + v).join(', ') : '0'}</p>
+                        <p className="text-slate-400">In 2-day window: {fetchDebug.inWindow ?? '—'}</p>
+                        <p className="text-slate-400">With bookmakers: {fetchDebug.withBookmakers ?? '—'}</p>
+                        <p className="text-slate-400">Sent to Gemini: {fetchDebug.geminiCalled ?? '—'}</p>
+                        <p className="text-slate-400">Approved (≥75%): {fetchDebug.geminiApproved ?? '—'}</p>
+                        {(fetchDebug.errors && fetchDebug.errors.length > 0) && (
+                          <p className="text-red-400 mt-2">Errors: {fetchDebug.errors.join('; ')}</p>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-3 justify-center">
+                      <button
+                        onClick={fetchLiveOpportunities}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                      >
+                        FETCH LIVE DATA
+                      </button>
+                      {webAppUrl && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const d = await jsonp(webAppUrl, { action: 'diagnostics' });
+                              const msg = d.status === 'ok'
+                                ? `Odds API: HTTP ${d.httpCode}\nEvents (EPL): ${d.eventCount}\nHas bookmakers: ${d.hasBookmakers}\nArray: ${d.isArray}\n${d.apiMessage ? 'API says: ' + d.apiMessage : ''}\nQuota remaining: ${d.remainingQuota ?? '—'}`
+                                : 'Diagnostics error: ' + (d.message || 'unknown');
+                              alert(msg);
+                            } catch (e) {
+                              alert('Diagnostics failed: ' + e.message);
+                            }
+                          }}
+                          className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-2xl font-bold text-sm"
+                        >
+                          CHECK ODDS API
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="grid gap-6">
