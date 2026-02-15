@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - UK Intelligence v2.7</title>
+  <title>ABIS Live - UK Intelligence v2.8</title>
   <!-- Note: Tailwind CDN and Babel are used for rapid prototyping. For production, compile ahead of time. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -149,10 +149,11 @@
           delete window[cbName];
         };
         
+        // v2.8: Increased timeout to 240s to handle initial multi-league data warm-up
         const timeout = setTimeout(() => {
           cleanup();
           reject(new Error('Request timeout'));
-        }, 120000);
+        }, 240000);
         
         window[cbName] = (data) => {
           clearTimeout(timeout);
@@ -310,7 +311,7 @@
         } catch (error) {
           console.error('Failed to fetch opportunities:', error);
           setOppsError(error.message === 'Request timeout'
-            ? 'The request timed out. This often happens on the first load as the backend initializes and fetches data from multiple APIs. Please try refreshing again.'
+            ? 'Synchronization took longer than expected. This is normal for the first "warm-up" fetch of the day. Your backend is currently building the cache—please wait 30 seconds and click "RETRY FETCH".'
             : 'Failed to fetch data: ' + error.message);
         } finally {
           setIsLoadingOpportunities(false);
@@ -463,8 +464,8 @@
       };
 
       const generateScript = () => `/**
- * ABIS UK LIVE PRODUCTION ENGINE - v2.7
- * Complete Web App with REST API endpoints for website sync
+ * ABIS UK LIVE PRODUCTION ENGINE - v2.8
+ * Optimized for low-latency multi-league data fetching.
  *
  * SECURITY NOTE: Your API keys are stored here in Google Apps Script,
  * which is private and not exposed in your public website code.
@@ -476,6 +477,7 @@ const FOOTBALL_DATA_TOKEN = "cf8c5dca8e00408bb3303906e89a54a0";
 const API_FOOTBALL_KEY = "YOUR_API_FOOTBALL_KEY_HERE";
 const START_BAL = ${currentBankroll || 5};
 const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
+const CACHE_PREFIX = "v28_";
 
 function getActiveSheet() {
   try {
@@ -512,7 +514,7 @@ function onOpen() {
 function initialSetup() {
   const ss = getActiveSheet();
   const tabs = {
-    'Config': [['Key', 'Value'], ['System', 'ABIS v2.7'], ['Last_Updated', new Date().toISOString()]],
+    'Config': [['Key', 'Value'], ['System', 'ABIS v2.8'], ['Last_Updated', new Date().toISOString()]],
     'Recommendations': [['Event', 'League', 'Selection', 'Odds', 'Confidence', 'Reasoning', 'Predicted_Score', 'Time']],
     'Placed_Bets': [['ID', 'Event', 'League', 'Selection', 'Odds', 'Stake', 'Status', 'Placed_At']],
     'Stats': [['Metric', 'Value'], ['Total_Profit', 0], ['Win_Rate', '0%']]
@@ -524,7 +526,7 @@ function initialSetup() {
     sheet.getRange(1, 1, tabs[tabName].length, tabs[tabName][0].length).setValues(tabs[tabName]);
   });
 
-  SpreadsheetApp.getUi().alert('✅ ABIS v2.7 Environment Initialized!');
+  SpreadsheetApp.getUi().alert('✅ ABIS v2.8 Environment Initialized!');
 }
 
 function doGet(e) {
@@ -534,7 +536,7 @@ function doGet(e) {
 
   try {
     if (action === 'test') {
-      output = { status: 'ok', message: 'ABIS v2.7 Active', timestamp: new Date().toISOString() };
+      output = { status: 'ok', message: 'ABIS v2.8 Active', timestamp: new Date().toISOString() };
     } else if (action === 'getRecommendations') {
       const recommendations = getLiveRecommendations();
       output = { status: 'ok', recommendations: recommendations };
@@ -544,7 +546,7 @@ function doGet(e) {
       output = { status: 'error', message: 'Unknown action: ' + (action || 'none') };
     }
   } catch (error) {
-    output = { status: 'error', message: error.toString() };
+    output = { status: 'error', message: error.toString(), stack: error.stack };
   }
 
   const json = JSON.stringify(output);
@@ -576,63 +578,76 @@ function getLiveRecommendations() {
   };
 
   const now = new Date();
-  const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000)); // 12 hours ago to include ongoing
-  const windowEnd = new Date(now.getTime() + (4 * 24 * 60 * 60 * 1000)); // 4 days ahead
+  const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
+  const windowEnd = new Date(now.getTime() + (4 * 24 * 60 * 60 * 1000));
 
-  const standingsCache = {};
+  const activeLeagues = {};
+  const allEvents = [];
+
+  // PHASE 1: Fetch all odds (fast, uses cache)
   Object.keys(leagues).forEach(key => {
     try {
-      const standings = getStandings(leagues[key].footballDataId);
-      if (standings) standingsCache[key] = standings;
-    } catch (e) {}
-  });
-
-  Object.keys(leagues).forEach(key => {
-    const league = leagues[key];
-    try {
-      const oddsEvents = fetchOdds(league.oddsKey);
+      const oddsEvents = fetchOdds(leagues[key].oddsKey);
       oddsEvents.forEach(event => {
         const eventTime = new Date(event.commence_time);
         if (eventTime >= windowStart && eventTime <= windowEnd) {
-          if (event.bookmakers && event.bookmakers.length > 0) {
-            const bookmaker = event.bookmakers[0];
-            const market = bookmaker.markets ? bookmaker.markets.find(m => m.key === 'h2h') : null;
-            if (market && market.outcomes && market.outcomes.length >= 2) {
-              const homeOutcome = market.outcomes.find(o => o.name === event.home_team);
-              const awayOutcome = market.outcomes.find(o => o.name === event.away_team);
-              const drawOutcome = market.outcomes.find(o => o.name === 'Draw');
-
-              const homeOdds = homeOutcome ? homeOutcome.price : 0;
-              const awayOdds = awayOutcome ? awayOutcome.price : 0;
-              const drawOdds = drawOutcome ? drawOutcome.price : 3.5;
-
-              if (homeOdds > 0 && awayOdds > 0) {
-                const analysis = analyzeMatch(event, homeOdds, awayOdds, drawOdds, standingsCache[key]);
-                recommendations.push({
-                  id: event.id,
-                  event: event.home_team + ' vs ' + event.away_team,
-                  league: league.name,
-                  selection: analysis.selection,
-                  odds: analysis.odds,
-                  confidence: analysis.confidence,
-                  reasoning: analysis.reasoning,
-                  predictedScore: analysis.predictedScore,
-                  scoreConfidence: analysis.scoreConfidence,
-                  commence_time: event.commence_time,
-                  isToday: eventTime.toDateString() === now.toDateString(),
-                  isLive: eventTime < now,
-                  type: 'Live Analysis',
-                  strategy: analysis.confidence >= 85 ? 'High Confidence' : 'Value Bet',
-                  bookie: bookmaker.title,
-                  customerType: 'All Users',
-                  url: 'https://www.google.com/search?q=' + encodeURIComponent(event.home_team + ' vs ' + event.away_team + ' odds')
-                });
-              }
-            }
-          }
+          allEvents.push({ event, leagueKey: key });
+          activeLeagues[key] = true;
         }
       });
-    } catch (err) {}
+    } catch (e) { Logger.log("Odds error " + key + ": " + e.message); }
+  });
+
+  // PHASE 2: Fetch standings ONLY for active leagues (conserves API credits)
+  const standingsCache = {};
+  Object.keys(activeLeagues).forEach(key => {
+    try {
+      const standings = getStandings(leagues[key].footballDataId);
+      if (standings) standingsCache[key] = standings;
+    } catch (e) { Logger.log("Standings error " + key + ": " + e.message); }
+  });
+
+  // PHASE 3: Process and Analyze
+  allEvents.forEach(({ event, leagueKey }) => {
+    const league = leagues[leagueKey];
+    try {
+      if (event.bookmakers && event.bookmakers.length > 0) {
+        const bookmaker = event.bookmakers[0];
+        const market = bookmaker.markets ? bookmaker.markets.find(m => m.key === 'h2h') : null;
+        if (market && market.outcomes && market.outcomes.length >= 2) {
+          const homeOutcome = market.outcomes.find(o => o.name === event.home_team);
+          const awayOutcome = market.outcomes.find(o => o.name === event.away_team);
+          const drawOutcome = market.outcomes.find(o => o.name === 'Draw');
+
+          const homeOdds = homeOutcome ? homeOutcome.price : 0;
+          const awayOdds = awayOutcome ? awayOutcome.price : 0;
+          const drawOdds = drawOutcome ? drawOutcome.price : 3.5;
+
+          if (homeOdds > 0 && awayOdds > 0) {
+            const analysis = analyzeMatch(event, homeOdds, awayOdds, drawOdds, standingsCache[leagueKey]);
+            recommendations.push({
+              id: event.id,
+              event: event.home_team + ' vs ' + event.away_team,
+              league: league.name,
+              selection: analysis.selection,
+              odds: analysis.odds,
+              confidence: analysis.confidence,
+              reasoning: analysis.reasoning,
+              predictedScore: analysis.predictedScore,
+              scoreConfidence: analysis.scoreConfidence,
+              commence_time: event.commence_time,
+              isToday: new Date(event.commence_time).toDateString() === now.toDateString(),
+              isLive: new Date(event.commence_time) < now,
+              type: 'Live Analysis',
+              strategy: analysis.confidence >= 85 ? 'High Confidence' : 'Value Bet',
+              bookie: bookmaker.title,
+              customerType: 'All Users',
+              url: 'https://www.google.com/search?q=' + encodeURIComponent(event.home_team + ' vs ' + event.away_team + ' odds')
+            });
+          }
+        }
+      }
+    } catch (err) { Logger.log("Analysis error: " + err.message); }
   });
 
   try { updateRecommendationsSheet(recommendations); } catch (e) {}
@@ -665,7 +680,6 @@ function analyzeMatch(event, homeOdds, awayOdds, drawOdds, standings) {
     }
   }
 
-  // Add Home Advantage (6%) and Favorite Bonus (7% if prob > 60%)
   const favoriteBonus = Math.max(homeProb, awayProb) > 60 ? 7 : 0;
   const homeScore = homeProb + homeBonus + 6 + favoriteBonus;
   const awayScore = awayProb + awayBonus + favoriteBonus;
@@ -696,7 +710,7 @@ function analyzeMatch(event, homeOdds, awayOdds, drawOdds, standings) {
 
 function fetchOdds(sport) {
   const cache = CacheService.getScriptCache();
-  const cached = cache.get('odds_' + sport);
+  const cached = cache.get(CACHE_PREFIX + 'odds_' + sport);
   if (cached) return JSON.parse(cached);
 
   const url = 'https://api.the-odds-api.com/v4/sports/' + sport + '/odds/?apiKey=' + ODDS_API_KEY + '&regions=uk&markets=h2h&oddsFormat=decimal';
@@ -704,7 +718,7 @@ function fetchOdds(sport) {
   if (response.getResponseCode() === 200) {
     const data = JSON.parse(response.getContentText());
     if (data && data.length > 0) {
-      try { cache.put('odds_' + sport, JSON.stringify(data), 300); } catch (e) {}
+      try { cache.put(CACHE_PREFIX + 'odds_' + sport, JSON.stringify(data), 600); } catch (e) {}
     }
     return data;
   }
@@ -714,7 +728,7 @@ function fetchOdds(sport) {
 function getStandings(leagueId) {
   if (!leagueId) return null;
   const cache = CacheService.getScriptCache();
-  const cached = cache.get('standings_' + leagueId);
+  const cached = cache.get(CACHE_PREFIX + 'standings_' + leagueId);
   if (cached) return JSON.parse(cached);
 
   const url = 'https://api.football-data.org/v4/competitions/' + leagueId + '/standings';
@@ -722,7 +736,7 @@ function getStandings(leagueId) {
   if (response.getResponseCode() === 200) {
     const data = JSON.parse(response.getContentText()).standings?.[0]?.table;
     if (data) {
-      try { cache.put('standings_' + leagueId, JSON.stringify(data), 21600); } catch (e) {}
+      try { cache.put(CACHE_PREFIX + 'standings_' + leagueId, JSON.stringify(data), 86400); } catch (e) {}
     }
     return data;
   }
@@ -1078,7 +1092,7 @@ function viewPLSummary() {
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
-                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v2.7</p>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v2.8</p>
               </div>
             </div>
 
@@ -1449,9 +1463,9 @@ function viewPLSummary() {
 
                   <section className="relative pl-16">
                     <div className="absolute left-0 top-0 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-xl">2</div>
-                    <h3 className="text-xl font-bold text-white mb-2">Inject Logic Layer (v2.7)</h3>
+                    <h3 className="text-xl font-bold text-white mb-2">Inject Logic Layer (v2.8)</h3>
                     <p className="text-slate-400 text-sm mb-4 leading-relaxed">
-                      Copy the complete production script below. This v2.7 backend is specifically optimized for <b>LIVE Games</b> and expanded UK/European league coverage.
+                      Copy the complete production script below. This v2.8 backend is specifically optimized for <b>low-latency sync</b> across 16+ UK/European leagues.
                     </p>
                     
                     <div className="mb-6 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
@@ -1460,12 +1474,12 @@ function viewPLSummary() {
                           <Shield className="text-white" size={20} />
                         </div>
                         <div>
-                          <h4 className="text-sm font-black text-emerald-400 mb-2 uppercase">v2.7 Production Update</h4>
+                          <h4 className="text-sm font-black text-emerald-400 mb-2 uppercase">v2.8 Performance Update</h4>
                           <ol className="text-xs text-slate-300 space-y-2 leading-relaxed">
-                            <li><b>1. Expanded Coverage:</b> Now includes 16+ leagues (PL, EFL, Scottish Prem, Bundesliga, Serie A, etc).</li>
-                            <li><b>2. Live Logic:</b> Captures games currently in progress (up to 12h look-back).</li>
-                            <li><b>3. Team Intelligence:</b> Uses fuzzy matching to link market odds with league form data.</li>
-                            <li><b>4. Reliability:</b> Integrated caching to prevent "Request Timeout" errors from Google Scripts.</li>
+                            <li><b>1. Smart Data Chunks:</b> Logic now fetches matches first, and only pulls standings for active leagues to conserve API credits.</li>
+                            <li><b>2. Extended Look-back:</b> Captures all live action with a robust 12h look-back window.</li>
+                            <li><b>3. Multi-Layer Caching:</b> v2.8 implements aggressive 24h caching for standings and 10m for odds.</li>
+                            <li><b>4. Warm-up Logic:</b> Handles the initial "cold start" sync gracefully with increased 4-minute timeouts.</li>
                           </ol>
                         </div>
                       </div>
