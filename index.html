@@ -313,39 +313,46 @@
       // ============================================================================
 
       const calculateEnhancedConfidence = (event, homeOdds, awayOdds, drawOdds, standings, allBookmakers) => {
-        let confidence = 70; // Base confidence
+        let confidence = 0; // Start from 0, build up
         let factors = [];
 
-        // FACTOR 1: Implied Probability (30% weight)
+        // FACTOR 1: Implied Probability (Base 50-75 points)
         const homeProb = (1 / homeOdds) * 100;
         const awayProb = (1 / awayOdds) * 100;
         const drawProb = (1 / drawOdds) * 100;
 
         let bestProb = Math.max(homeProb, awayProb, drawProb);
-        let oddsConfidence = Math.min(30, bestProb * 0.3);
-        confidence += oddsConfidence;
-        factors.push({ name: 'Market Odds', value: oddsConfidence.toFixed(1), max: 30 });
+        
+        // Scale: 50% prob = 60 confidence, 70% prob = 75 confidence, 80%+ = 80 confidence
+        let oddsConfidence = 50 + (bestProb - 50) * 0.6; // More realistic scaling
+        oddsConfidence = Math.min(80, Math.max(60, oddsConfidence));
+        
+        confidence = oddsConfidence;
+        factors.push({ name: 'Market Odds', value: oddsConfidence.toFixed(1), max: 80 });
 
-        // FACTOR 2: Multi-Bookmaker Consensus (20% weight)
+        // FACTOR 2: Multi-Bookmaker Consensus (0-8 points)
         if (allBookmakers && allBookmakers.length >= 2) {
           const oddsVariance = calculateOddsVariance(allBookmakers, event.home_team, event.away_team);
           let consensusBonus = 0;
           
-          if (oddsVariance < 0.1) {
-            consensusBonus = 20; // Strong consensus
-            factors.push({ name: 'Bookmaker Consensus', value: '20 (Strong)', max: 20 });
+          if (oddsVariance < 0.05) {
+            consensusBonus = 8; // Very strong consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '8 (Very Strong)', max: 8 });
+          } else if (oddsVariance < 0.1) {
+            consensusBonus = 5; // Strong consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '5 (Strong)', max: 8 });
           } else if (oddsVariance < 0.2) {
-            consensusBonus = 12; // Moderate consensus
-            factors.push({ name: 'Bookmaker Consensus', value: '12 (Moderate)', max: 20 });
+            consensusBonus = 2; // Moderate consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '2 (Moderate)', max: 8 });
           } else {
-            consensusBonus = 5; // Weak consensus
-            factors.push({ name: 'Bookmaker Consensus', value: '5 (Weak)', max: 20 });
+            consensusBonus = 0; // Weak consensus - no bonus
+            factors.push({ name: 'Bookmaker Consensus', value: '0 (Weak)', max: 8 });
           }
           
           confidence += consensusBonus;
         }
 
-        // FACTOR 3: League Position & Form (25% weight)
+        // FACTOR 3: League Position & Form (0-6 points)
         if (standings) {
           const homeTeam = findTeamInStandings(standings, event.home_team);
           const awayTeam = findTeamInStandings(standings, event.away_team);
@@ -354,79 +361,77 @@
             let positionBonus = 0;
             const positionDiff = Math.abs(homeTeam.position - awayTeam.position);
 
-            // Large position gap = higher confidence
+            // More realistic position bonuses
             if (positionDiff >= 10) {
-              positionBonus = 15;
+              positionBonus = 4;
             } else if (positionDiff >= 5) {
-              positionBonus = 10;
-            } else if (positionDiff >= 2) {
-              positionBonus = 5;
+              positionBonus = 2;
+            } else if (positionDiff >= 3) {
+              positionBonus = 1;
             }
 
             // Form bonus (recent results)
             const homeForm = homeTeam.form ? calculateFormScore(homeTeam.form) : 0;
             const awayForm = awayTeam.form ? calculateFormScore(awayTeam.form) : 0;
-            const formBonus = Math.abs(homeForm - awayForm) * 2; // Up to 10 points
+            const formBonus = Math.min(2, Math.abs(homeForm - awayForm) * 0.4); // Max 2 points
 
-            const totalPositionBonus = Math.min(25, positionBonus + formBonus);
+            const totalPositionBonus = Math.min(6, positionBonus + formBonus);
             confidence += totalPositionBonus;
             
             factors.push({ 
               name: 'Position & Form', 
               value: `${totalPositionBonus.toFixed(1)} (${homeTeam.position}th vs ${awayTeam.position}th)`, 
-              max: 25 
+              max: 6 
             });
           }
         }
 
-        // FACTOR 4: Home Advantage (10% weight)
+        // FACTOR 4: Home Advantage (0-3 points)
         let homeAdvantage = 0;
-        if (homeProb > awayProb) {
-          homeAdvantage = 10; // Home team favored
-        } else if (homeProb > drawProb) {
-          homeAdvantage = 5; // Home team competitive
+        if (homeProb > awayProb && homeProb > drawProb) {
+          homeAdvantage = 3; // Home team is favorite
+        } else if (homeProb > awayProb) {
+          homeAdvantage = 1; // Home team competitive
         }
         confidence += homeAdvantage;
         if (homeAdvantage > 0) {
-          factors.push({ name: 'Home Advantage', value: homeAdvantage.toFixed(1), max: 10 });
+          factors.push({ name: 'Home Advantage', value: homeAdvantage.toFixed(1), max: 3 });
         }
 
-        // FACTOR 5: Time to Kick-off (5% weight)
+        // FACTOR 5: Time to Kick-off (0-2 points)
         const kickoffTime = new Date(event.commence_time);
         const hoursUntilKickoff = (kickoffTime - new Date()) / (1000 * 60 * 60);
         
         let timingBonus = 0;
         if (hoursUntilKickoff < 6) {
-          timingBonus = 5; // Very close to kickoff - odds are most accurate
+          timingBonus = 2; // Very close to kickoff
         } else if (hoursUntilKickoff < 24) {
-          timingBonus = 3; // Within 24 hours
-        } else {
-          timingBonus = 0; // Early odds less reliable
+          timingBonus = 1; // Within 24 hours
         }
         confidence += timingBonus;
         if (timingBonus > 0) {
-          factors.push({ name: 'Timing', value: `${timingBonus} (<${Math.round(hoursUntilKickoff)}h)`, max: 5 });
+          factors.push({ name: 'Timing', value: `${timingBonus} (<${Math.round(hoursUntilKickoff)}h)`, max: 2 });
         }
 
-        // FACTOR 6: Favorite Strength (10% weight)
+        // FACTOR 6: Favorite Strength (0-6 points)
         const favoriteStrength = Math.max(homeProb, awayProb, drawProb);
         let strengthBonus = 0;
         
-        if (favoriteStrength > 70) {
-          strengthBonus = 10; // Very strong favorite
-        } else if (favoriteStrength > 60) {
-          strengthBonus = 7;
-        } else if (favoriteStrength > 55) {
+        if (favoriteStrength > 75) {
+          strengthBonus = 6; // Very strong favorite
+        } else if (favoriteStrength > 65) {
           strengthBonus = 4;
+        } else if (favoriteStrength > 55) {
+          strengthBonus = 2;
         }
         
         confidence += strengthBonus;
         if (strengthBonus > 0) {
-          factors.push({ name: 'Favorite Strength', value: strengthBonus.toFixed(1), max: 10 });
+          factors.push({ name: 'Favorite Strength', value: strengthBonus.toFixed(1), max: 6 });
         }
 
-        // Cap at 98% (always leave room for uncertainty)
-        confidence = Math.min(98, Math.max(70, Math.round(confidence)));
+        // Final range: 60-95% (more realistic spread)
+        confidence = Math.min(95, Math.max(60, Math.round(confidence)));
 
         return { confidence, factors };
       };
