@@ -190,6 +190,10 @@
         const saved = localStorage.getItem('abis_settled_bets');
         return saved ? JSON.parse(saved) : [];
       });
+      const [manualPLAdjustment, setManualPLAdjustment] = useState(() => {
+        const saved = localStorage.getItem('abis_manual_pl');
+        return saved ? parseFloat(saved) : 0;
+      });
 
       const [opportunities, setOpportunities] = useState([]);
       const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
@@ -248,6 +252,10 @@
       useEffect(() => {
         localStorage.setItem('abis_settled_bets', JSON.stringify(settledBets));
       }, [settledBets]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_manual_pl', manualPLAdjustment.toString());
+      }, [manualPLAdjustment]);
 
       // ============================================================================
       // API FETCHERS
@@ -794,7 +802,8 @@
         const wonBets = settledBets.filter(b => b.status === 'won').length;
         const totalStaked = settledBets.reduce((sum, b) => sum + b.stake, 0);
         const totalReturns = settledBets.reduce((sum, b) => sum + b.actualReturn, 0);
-        const netProfit = totalReturns - totalStaked;
+        const calculatedProfit = totalReturns - totalStaked;
+        const netProfit = calculatedProfit + manualPLAdjustment;
         const winRate = totalBets > 0 ? ((wonBets / totalBets) * 100).toFixed(1) : 0;
 
         return { totalBets, wonBets, totalStaked, totalReturns, netProfit, winRate };
@@ -1119,12 +1128,20 @@
                         className={`bg-transparent text-3xl font-black w-full focus:outline-none ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
                         value={stats.netProfit.toFixed(2)}
                         onChange={(e) => {
-                          const newProfit = parseFloat(e.target.value) || 0;
-                          const adjustment = newProfit - stats.netProfit;
-                          setCurrentBankroll(prev => prev + adjustment);
+                          const newTotalPL = parseFloat(e.target.value) || 0;
+                          const totalStaked = settledBets.reduce((sum, b) => sum + b.stake, 0);
+                          const totalReturns = settledBets.reduce((sum, b) => sum + b.actualReturn, 0);
+                          const calculatedProfit = totalReturns - totalStaked;
+                          const newAdjustment = newTotalPL - calculatedProfit;
+                          setManualPLAdjustment(newAdjustment);
                         }}
                       />
                     </div>
+                    {manualPLAdjustment !== 0 && (
+                      <p className="text-xs text-slate-500 mt-2">
+                        Manual adjustment: {manualPLAdjustment >= 0 ? '+' : ''}£{manualPLAdjustment.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                   <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
                     <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Win Rate</p>
@@ -1385,9 +1402,130 @@
                   </div>
                 ) : (
                   <div className="grid gap-8">
-                    {laLigaMatches.map(match => (
-                      <OpportunityCard key={match.id} opp={match} />
-                    ))}
+                    {laLigaMatches.map(match => {
+                      // Calculate likely scores based on odds
+                      const homeProb = (1 / match.homeOdds) * 100;
+                      const awayProb = (1 / match.awayOdds) * 100;
+                      const drawProb = (1 / match.drawOdds) * 100;
+
+                      let likelyScore = "";
+                      let outcome = "";
+                      let outcomeProb = 0;
+
+                      if (homeProb > awayProb && homeProb > drawProb) {
+                        outcome = "Home Win";
+                        outcomeProb = homeProb;
+                        if (homeProb > 75) {
+                          likelyScore = "3-0";
+                        } else if (homeProb > 65) {
+                          likelyScore = "2-0";
+                        } else if (homeProb > 55) {
+                          likelyScore = "2-1";
+                        } else {
+                          likelyScore = "1-0";
+                        }
+                      } else if (awayProb > homeProb && awayProb > drawProb) {
+                        outcome = "Away Win";
+                        outcomeProb = awayProb;
+                        if (awayProb > 75) {
+                          likelyScore = "0-3";
+                        } else if (awayProb > 65) {
+                          likelyScore = "0-2";
+                        } else if (awayProb > 55) {
+                          likelyScore = "1-2";
+                        } else {
+                          likelyScore = "0-1";
+                        }
+                      } else {
+                        outcome = "Draw";
+                        outcomeProb = drawProb;
+                        if (homeProb > 40 && awayProb > 40) {
+                          likelyScore = "2-2";
+                        } else {
+                          likelyScore = "1-1";
+                        }
+                      }
+
+                      return (
+                        <div key={match.id} className={`bg-slate-900 border-2 rounded-2xl shadow-2xl p-8 ${
+                          match.isElClasico ? 'border-red-500/60 shadow-red-500/20' : 'border-blue-500/50 hover:border-blue-500 shadow-blue-500/10'
+                        }`}>
+                          {match.isElClasico && (
+                            <div className="bg-gradient-to-r from-red-600 to-blue-600 text-white text-sm font-black px-6 py-3 rounded-xl -mx-8 -mt-8 mb-6 text-center uppercase">
+                              ⚽ EL CLÁSICO ⚽
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-black text-white">{match.event}</h3>
+                            <span className="text-sm text-slate-400">
+                              {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          </div>
+                          
+                          <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30 rounded-2xl p-6 mb-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="bg-blue-500 p-2 rounded-lg">
+                                <TrendingUp size={20} className="text-white" />
+                              </div>
+                              <h4 className="text-lg font-black text-white">BOOKMAKER PREDICTION</h4>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                              <div className="bg-slate-950/50 rounded-xl p-4 text-center border-2 border-slate-700">
+                                <p className="text-xs text-slate-400 uppercase mb-2 font-bold">Likely Score</p>
+                                <p className="text-4xl font-black text-emerald-400">{likelyScore}</p>
+                              </div>
+                              <div className="bg-slate-950/50 rounded-xl p-4 text-center border-2 border-slate-700">
+                                <p className="text-xs text-slate-400 uppercase mb-2 font-bold">Outcome</p>
+                                <p className="text-xl font-black text-blue-400">{outcome}</p>
+                                <p className="text-xs text-slate-500 mt-1">{outcomeProb.toFixed(1)}% prob</p>
+                              </div>
+                              <div className="bg-slate-950/50 rounded-xl p-4 text-center border-2 border-slate-700">
+                                <p className="text-xs text-slate-400 uppercase mb-2 font-bold">Confidence</p>
+                                <p className="text-4xl font-black text-amber-400">{match.confidence}%</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="bg-slate-950/70 rounded-lg p-3 border border-slate-700">
+                                <p className="text-[10px] text-slate-500 uppercase mb-1 font-bold">Home Win</p>
+                                <p className="text-lg font-black text-white">{match.homeOdds.toFixed(2)}</p>
+                                <p className="text-xs text-slate-400">{homeProb.toFixed(1)}%</p>
+                              </div>
+                              <div className="bg-slate-950/70 rounded-lg p-3 border border-slate-700">
+                                <p className="text-[10px] text-slate-500 uppercase mb-1 font-bold">Draw</p>
+                                <p className="text-lg font-black text-white">{match.drawOdds.toFixed(2)}</p>
+                                <p className="text-xs text-slate-400">{drawProb.toFixed(1)}%</p>
+                              </div>
+                              <div className="bg-slate-950/70 rounded-lg p-3 border border-slate-700">
+                                <p className="text-[10px] text-slate-500 uppercase mb-1 font-bold">Away Win</p>
+                                <p className="text-lg font-black text-white">{match.awayOdds.toFixed(2)}</p>
+                                <p className="text-xs text-slate-400">{awayProb.toFixed(1)}%</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {match.reasoning && (
+                            <div className="bg-slate-950/50 rounded-2xl p-6 mb-6 border-2 border-slate-700">
+                              <p className="text-xs text-slate-500 uppercase font-black mb-2">Analysis</p>
+                              <p className="text-sm text-slate-300 leading-relaxed">{match.reasoning}</p>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => handlePlaceBet(match, null, 'single')}
+                              disabled={currentBankroll < userStakeInput}
+                              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all active:scale-95 flex items-center gap-2 shadow-lg"
+                            >
+                              <Zap size={16} className="fill-current" />
+                              PLACE BET ON {outcome.toUpperCase()}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
