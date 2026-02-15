@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - UK Intelligence v2.5</title>
+  <title>ABIS Live - UK Intelligence v2.6</title>
   <!-- Note: Tailwind CDN and Babel are used for rapid prototyping. For production, compile ahead of time. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -452,7 +452,7 @@
       };
 
       const generateScript = () => `/**
- * ABIS UK LIVE PRODUCTION ENGINE - v2.5
+ * ABIS UK LIVE PRODUCTION ENGINE - v2.6
  * Complete Web App with REST API endpoints for website sync
  *
  * SECURITY NOTE: Your API keys are stored here in Google Apps Script,
@@ -467,14 +467,20 @@ const START_BAL = 5;
 const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
 
 function getActiveSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) return ss;
+  } catch (e) {}
+
   if (MANUAL_SHEET_ID !== "" && MANUAL_SHEET_ID !== "YOUR_GOOGLE_SHEET_ID_HERE") {
-    return SpreadsheetApp.openById(MANUAL_SHEET_ID);
+    try {
+      return SpreadsheetApp.openById(MANUAL_SHEET_ID);
+    } catch (e) {
+      Logger.log("Failed to open sheet by ID: " + e.message);
+    }
   }
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) {
-    throw new Error("No active spreadsheet found.");
-  }
-  return ss;
+
+  throw new Error("No active spreadsheet found. Please bind the script to a sheet or set MANUAL_SHEET_ID.");
 }
 
 function onOpen() {
@@ -495,7 +501,7 @@ function onOpen() {
 function initialSetup() {
   const ss = getActiveSheet();
   const tabs = {
-    'Config': [['Key', 'Value'], ['System', 'ABIS v2.5'], ['Last_Updated', new Date().toISOString()]],
+    'Config': [['Key', 'Value'], ['System', 'ABIS v2.6'], ['Last_Updated', new Date().toISOString()]],
     'Recommendations': [['Event', 'League', 'Selection', 'Odds', 'Confidence', 'Reasoning', 'Predicted_Score', 'Time']],
     'Placed_Bets': [['ID', 'Event', 'League', 'Selection', 'Odds', 'Stake', 'Status', 'Placed_At']],
     'Stats': [['Metric', 'Value'], ['Total_Profit', 0], ['Win_Rate', '0%']]
@@ -507,7 +513,7 @@ function initialSetup() {
     sheet.getRange(1, 1, tabs[tabName].length, tabs[tabName][0].length).setValues(tabs[tabName]);
   });
 
-  SpreadsheetApp.getUi().alert('✅ ABIS v2.5 Environment Initialized!');
+  SpreadsheetApp.getUi().alert('✅ ABIS v2.6 Environment Initialized!');
 }
 
 function doGet(e) {
@@ -517,7 +523,7 @@ function doGet(e) {
 
   try {
     if (action === 'test') {
-      output = { status: 'ok', message: 'ABIS v2.5 Active', timestamp: new Date().toISOString() };
+      output = { status: 'ok', message: 'ABIS v2.6 Active', timestamp: new Date().toISOString() };
     } else if (action === 'getRecommendations') {
       const recommendations = getLiveRecommendations();
       output = { status: 'ok', recommendations: recommendations };
@@ -543,11 +549,17 @@ function getLiveRecommendations() {
     'PL': { oddsKey: 'soccer_epl', footballDataId: 2021, name: 'Premier League' },
     'ELC': { oddsKey: 'soccer_efl_champ', footballDataId: 2016, name: 'Championship' },
     'EL1': { oddsKey: 'soccer_england_league1', footballDataId: 2017, name: 'League One' },
-    'EL2': { oddsKey: 'soccer_england_league2', footballDataId: 2018, name: 'League Two' }
+    'EL2': { oddsKey: 'soccer_england_league2', footballDataId: 2018, name: 'League Two' },
+    'FAC': { oddsKey: 'soccer_fa_cup', footballDataId: 2000, name: 'FA Cup' },
+    'EFL': { oddsKey: 'soccer_england_efl_cup', footballDataId: 2139, name: 'EFL Cup' },
+    'SP': { oddsKey: 'soccer_scotland_premiership', footballDataId: 2001, name: 'Scottish Premiership' },
+    'LL': { oddsKey: 'soccer_spain_la_liga', footballDataId: 2014, name: 'La Liga' },
+    'NL': { oddsKey: 'soccer_england_national_league', footballDataId: null, name: 'National League' }
   };
 
   const now = new Date();
-  const fourDays = new Date(now.getTime() + (4 * 24 * 60 * 60 * 1000));
+  const windowStart = new Date(now.getTime() - (8 * 60 * 60 * 1000)); // 8 hours ago to include ongoing
+  const windowEnd = new Date(now.getTime() + (4 * 24 * 60 * 60 * 1000)); // 4 days ahead
 
   const standingsCache = {};
   Object.keys(leagues).forEach(key => {
@@ -563,7 +575,7 @@ function getLiveRecommendations() {
       const oddsEvents = fetchOdds(league.oddsKey);
       oddsEvents.forEach(event => {
         const eventTime = new Date(event.commence_time);
-        if (eventTime >= now && eventTime <= fourDays) {
+        if (eventTime >= windowStart && eventTime <= windowEnd) {
           if (event.bookmakers && event.bookmakers.length > 0) {
             const bookmaker = event.bookmakers[0];
             const market = bookmaker.markets ? bookmaker.markets.find(m => m.key === 'h2h') : null;
@@ -586,6 +598,7 @@ function getLiveRecommendations() {
                   scoreConfidence: analysis.scoreConfidence,
                   commence_time: event.commence_time,
                   isToday: eventTime.toDateString() === now.toDateString(),
+                  isLive: eventTime < now,
                   type: 'Smart Analysis',
                   strategy: analysis.confidence >= 85 ? 'High Confidence' : 'Value Bet',
                   bookie: bookmaker.title,
@@ -612,8 +625,17 @@ function analyzeMatch(event, homeOdds, awayOdds, drawOdds, standings) {
   let homeBonus = 0, awayBonus = 0, formInfo = '';
 
   if (standings) {
-    const homeTeam = standings.find(t => t.team.name.toLowerCase().includes(event.home_team.split(' ')[0].toLowerCase()));
-    const awayTeam = standings.find(t => t.team.name.toLowerCase().includes(event.away_team.split(' ')[0].toLowerCase()));
+    const homeTeam = standings.find(t => {
+      const sName = t.team.name.toLowerCase();
+      const eName = event.home_team.toLowerCase();
+      return sName.includes(eName) || eName.includes(sName) || sName.split(' ')[0] === eName.split(' ')[0];
+    });
+    const awayTeam = standings.find(t => {
+      const sName = t.team.name.toLowerCase();
+      const eName = event.away_team.toLowerCase();
+      return sName.includes(eName) || eName.includes(sName) || sName.split(' ')[0] === eName.split(' ')[0];
+    });
+
     if (homeTeam && awayTeam) {
       homeBonus = homeTeam.position <= 6 ? 12 : homeTeam.position <= 12 ? 6 : 3;
       awayBonus = awayTeam.position <= 6 ? 12 : awayTeam.position <= 12 ? 6 : 3;
@@ -1011,7 +1033,7 @@ function viewPLSummary() {
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
-                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v2.5</p>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v2.6</p>
               </div>
             </div>
 
@@ -1266,7 +1288,7 @@ function viewPLSummary() {
                       ) : (
                         <>
                           {/* Group opportunities by league */}
-                          {['Premier League', 'La Liga', 'Championship', 'League One', 'League Two', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
+                          {['Premier League', 'Championship', 'League One', 'League Two', 'National League', 'FA Cup', 'EFL Cup', 'Scottish Premiership', 'La Liga', 'UK Horse Racing', 'UK Greyhound Racing'].map(league => {
                             const leagueOpps = opportunities
                               .filter(opp => opp.league === league)
                               .sort((a, b) => b.confidence - a.confidence); // Sort by confidence descending
@@ -1285,12 +1307,16 @@ function viewPLSummary() {
                                 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                   {leagueOpps.map(opp => (
-                                    <div key={opp.id} className={opp.isToday ? 'ring-2 ring-amber-500 rounded-3xl' : ''}>
-                                      {opp.isToday && (
-                                        <div className="bg-amber-500 text-slate-900 text-xs font-black px-4 py-2 rounded-t-3xl text-center uppercase tracking-wider">
-                                          ⚡ EVENT TODAY - {new Date(opp.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    <div key={opp.id} className={`${opp.isToday ? 'ring-2 ring-amber-500' : ''} ${opp.isLive ? 'ring-2 ring-red-500' : ''} rounded-3xl overflow-hidden`}>
+                                      {opp.isLive ? (
+                                        <div className="bg-red-600 text-white text-[10px] font-black px-4 py-2 text-center uppercase tracking-widest animate-pulse">
+                                          🔴 LIVE NOW - STARTED {new Date(opp.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                         </div>
-                                      )}
+                                      ) : opp.isToday ? (
+                                        <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-4 py-2 text-center uppercase tracking-widest">
+                                          ⚡ TODAY at {new Date(opp.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </div>
+                                      ) : null}
                                       <OpportunityCard opp={opp} />
                                     </div>
                                   ))}
