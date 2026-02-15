@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - Direct Fetch Test</title>
+  <title>ABIS Live - UK Intelligence v3.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes fadeIn {
@@ -23,18 +23,78 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
-    const { useState } = React;
+    const { useState, useEffect } = React;
 
-    // Icons (simplified)
-    const Shield = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    // Lucide Icons
+    const Shield = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       </svg>
     );
 
-    const Zap = ({size=24}) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" strokeWidth="2">
+    const TrendingUp = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+    );
+
+    const Zap = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    );
+
+    const LayoutDashboard = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+      </svg>
+    );
+
+    const History = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/>
+      </svg>
+    );
+
+    const Wallet = ({className, size=24}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+      </svg>
+    );
+
+    const Users = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    );
+
+    const ArrowUpRight = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+      </svg>
+    );
+
+    const CheckSquare = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    );
+
+    const Calculator = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="16" y1="18" x2="16" y2="18.01"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="8" y1="18" x2="8" y2="18.01"/>
+      </svg>
+    );
+
+    const Menu = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    );
+
+    const X = () => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
     );
 
@@ -45,28 +105,82 @@
     );
 
     const App = () => {
-      const [opportunities, setOpportunities] = useState([]);
-      const [isLoading, setIsLoading] = useState(false);
-      const [error, setError] = useState(null);
-      const [lastFetch, setLastFetch] = useState(null);
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [initialCapital, setInitialCapital] = useState("");
+      const [currentBankroll, setCurrentBankroll] = useState(() => {
+        const saved = localStorage.getItem('abis_bankroll');
+        return saved ? parseFloat(saved) : 0;
+      });
+      const [userStakeInput, setUserStakeInput] = useState(() => {
+        const saved = localStorage.getItem('abis_default_stake');
+        return saved ? parseFloat(saved) : 10;
+      });
+      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [placedBets, setPlacedBets] = useState(() => {
+        const saved = localStorage.getItem('abis_placed_bets');
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [settledBets, setSettledBets] = useState(() => {
+        const saved = localStorage.getItem('abis_settled_bets');
+        return saved ? JSON.parse(saved) : [];
+      });
 
-      // API Configuration - Using your keys
+      // State for live opportunities
+      const [opportunities, setOpportunities] = useState([]);
+      const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
+      const [lastDataFetch, setLastDataFetch] = useState(null);
+      const [oppsError, setOppsError] = useState(null);
+      const [laLigaMatches, setLaLigaMatches] = useState([]);
+      const [isLoadingLaLiga, setIsLoadingLaLiga] = useState(false);
+
+      // API Configuration
       const API_KEYS = {
         primary: "0d7491630a8624fe87ea1da0dad2ea3f",
         backup: "64a74abb6980d161caf1ab8ff856dea9"
       };
 
-      // UK Leagues to fetch
-      const UK_LEAGUES = [
-        { key: 'soccer_epl', name: 'Premier League' },
-        { key: 'soccer_efl_champ', name: 'Championship' },
-        { key: 'soccer_england_league1', name: 'League One' },
-        { key: 'soccer_england_league2', name: 'League Two' },
-        { key: 'soccer_fa_cup', name: 'FA Cup' },
-        { key: 'soccer_england_efl_cup', name: 'EFL Cup' },
-        { key: 'soccer_spl', name: 'Scottish Premiership' },
-        { key: 'soccer_england_national_league', name: 'National League' }
-      ];
+      // All Leagues
+      const LEAGUES = {
+        uk: [
+          { key: 'soccer_epl', name: 'Premier League' },
+          { key: 'soccer_efl_champ', name: 'Championship' },
+          { key: 'soccer_england_league1', name: 'League One' },
+          { key: 'soccer_england_league2', name: 'League Two' },
+          { key: 'soccer_fa_cup', name: 'FA Cup' },
+          { key: 'soccer_england_efl_cup', name: 'EFL Cup' },
+          { key: 'soccer_spl', name: 'Scottish Premiership' },
+          { key: 'soccer_england_national_league', name: 'National League' }
+        ],
+        europe: [
+          { key: 'soccer_spain_la_liga', name: 'La Liga' },
+          { key: 'soccer_germany_bundesliga', name: 'Bundesliga' },
+          { key: 'soccer_italy_serie_a', name: 'Serie A' },
+          { key: 'soccer_france_ligue_one', name: 'Ligue 1' },
+          { key: 'soccer_netherlands_eredivisie', name: 'Eredivisie' },
+          { key: 'soccer_portugal_primeira_liga', name: 'Primeira Liga' },
+          { key: 'soccer_belgium_first_div', name: 'Jupiler Pro League' },
+          { key: 'soccer_turkey_super_league', name: 'Süper Lig' }
+        ]
+      };
+
+      // Save to localStorage whenever data changes
+      useEffect(() => {
+        if (currentBankroll >= 0) {
+          localStorage.setItem('abis_bankroll', currentBankroll.toString());
+        }
+      }, [currentBankroll]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_default_stake', userStakeInput.toString());
+      }, [userStakeInput]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_placed_bets', JSON.stringify(placedBets));
+      }, [placedBets]);
+
+      useEffect(() => {
+        localStorage.setItem('abis_settled_bets', JSON.stringify(settledBets));
+      }, [settledBets]);
 
       const fetchDirectOdds = async (sport, apiKey) => {
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=uk&markets=h2h&oddsFormat=decimal`;
@@ -76,7 +190,7 @@
           if (response.ok) {
             return await response.json();
           } else if (response.status === 429) {
-            console.log('Rate limit hit, trying backup...');
+            console.log('Rate limit hit');
             return null;
           } else {
             console.error(`API error for ${sport}: ${response.status}`);
@@ -141,6 +255,7 @@
           confidence,
           reasoning: `${selection} recommended with ${confidence}% confidence based on current market odds. ${leagueName} fixture with ${strategy.toLowerCase()} characteristics.`,
           predictedScore,
+          scoreConfidence: Math.max(65, confidence - Math.floor(Math.random() * 8 + 3)),
           strategy,
           bookie: bookmaker?.title || 'Market Average',
           commence_time: event.commence_time,
@@ -152,33 +267,26 @@
         };
       };
 
-      const fetchAllMatches = async () => {
-        setIsLoading(true);
-        setError(null);
+      const fetchLiveOpportunities = async () => {
+        setIsLoadingOpportunities(true);
+        setOppsError(null);
         
         const allRecommendations = [];
         const now = new Date();
         const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
-        const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000)); // 2 days ahead as requested
+        const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
 
-        console.log('Fetching matches from', UK_LEAGUES.length, 'UK leagues...');
+        const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
 
-        for (const league of UK_LEAGUES) {
+        for (const league of allLeagues) {
           try {
-            console.log(`Fetching ${league.name}...`);
-            
-            // Try primary key first
             let events = await fetchDirectOdds(league.key, API_KEYS.primary);
             
-            // If primary fails (rate limit), try backup
             if (events === null) {
-              console.log(`Primary key failed for ${league.name}, using backup...`);
               events = await fetchDirectOdds(league.key, API_KEYS.backup);
             }
 
             if (events && events.length > 0) {
-              console.log(`✅ ${league.name}: ${events.length} events found`);
-              
               events.forEach(event => {
                 const eventTime = new Date(event.commence_time);
                 
@@ -189,230 +297,793 @@
                   }
                 }
               });
-            } else {
-              console.log(`❌ ${league.name}: No events`);
             }
           } catch (err) {
             console.error(`Error fetching ${league.name}:`, err);
           }
         }
 
-        console.log(`Total recommendations: ${allRecommendations.length}`);
-        
-        // Sort by confidence
         allRecommendations.sort((a, b) => b.confidence - a.confidence);
         
         setOpportunities(allRecommendations);
-        setLastFetch(new Date());
-        setIsLoading(false);
+        setLastDataFetch(new Date());
+        setIsLoadingOpportunities(false);
 
         if (allRecommendations.length === 0) {
-          setError('No matches found in the next 2 days. The Odds API may not have UK matches scheduled, or all API keys have hit rate limits.');
+          setOppsError('No matches found in the next 2 days.');
         }
       };
 
-      return (
-        <div className="min-h-screen bg-slate-950 text-slate-200">
-          {/* Header */}
-          <nav className="fixed top-0 left-0 right-0 h-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 z-50 px-6 lg:px-12 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-600/20">
-                <Shield size={24} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
-                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">Direct Fetch Test</p>
-              </div>
-            </div>
+      const fetchLaLigaMatches = async () => {
+        setIsLoadingLaLiga(true);
+        
+        try {
+          let events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.primary);
+          
+          if (events === null) {
+            events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.backup);
+          }
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={fetchAllMatches}
-                disabled={isLoading}
-                className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    FETCHING...
-                  </>
-                ) : (
-                  <>
-                    <Zap size={16} className="fill-current" />
-                    FETCH UK MATCHES
-                  </>
-                )}
-              </button>
-            </div>
-          </nav>
+          const rmBarcaMatches = [];
 
-          {/* Main Content */}
-          <main className="pt-28 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
-            <header className="mb-12">
-              <h2 className="text-3xl font-black text-white tracking-tight mb-2">
-                UK Football Matches
-              </h2>
-              <p className="text-slate-500 font-medium">
-                Direct API fetch - Next 2 days • All UK leagues
-                {lastFetch && (
-                  <span className="ml-2 text-xs">
-                    • Last updated: {lastFetch.toLocaleTimeString()}
+          if (events && events.length > 0) {
+            events.forEach(event => {
+              const homeLower = event.home_team.toLowerCase();
+              const awayLower = event.away_team.toLowerCase();
+
+              const isRM = homeLower.includes('real madrid') || awayLower.includes('real madrid');
+              const isBarca = homeLower.includes('barcelona') || awayLower.includes('barcelona');
+
+              if (isRM || isBarca) {
+                const bookmaker = event.bookmakers?.[0];
+                const market = bookmaker?.markets?.find(m => m.key === 'h2h');
+
+                if (market && market.outcomes) {
+                  const homeOdds = market.outcomes.find(o => o.name === event.home_team)?.price || 0;
+                  const awayOdds = market.outcomes.find(o => o.name === event.away_team)?.price || 0;
+                  const drawOdds = market.outcomes.find(o => o.name === 'Draw')?.price || 3.5;
+
+                  if (homeOdds > 0 && awayOdds > 0) {
+                    const homeProb = (1 / homeOdds) * 100;
+                    const awayProb = (1 / awayOdds) * 100;
+
+                    let predictedScore = "1-1";
+                    let confidence = 75;
+                    let selection = "Draw";
+
+                    if (homeProb > awayProb + 10) {
+                      predictedScore = "2-1";
+                      confidence = Math.round(homeProb);
+                      selection = "Home Win";
+                    } else if (awayProb > homeProb + 10) {
+                      predictedScore = "1-2";
+                      confidence = Math.round(awayProb);
+                      selection = "Away Win";
+                    }
+
+                    rmBarcaMatches.push({
+                      id: event.id,
+                      event: `${event.home_team} vs ${event.away_team}`,
+                      league: 'La Liga',
+                      selection,
+                      commence_time: event.commence_time,
+                      predictedScore,
+                      scoreConfidence: confidence,
+                      confidence,
+                      reasoning: `Analysis for ${event.home_team} vs ${event.away_team}. Expected outcome: ${predictedScore} based on current market odds.`,
+                      isElClasico: isRM && isBarca,
+                      odds: [{
+                        homeOdds,
+                        awayOdds,
+                        drawOdds,
+                        bookie: bookmaker?.title || 'Market Average'
+                      }]
+                    });
+                  }
+                }
+              }
+            });
+          }
+
+          setLaLigaMatches(rmBarcaMatches);
+        } catch (error) {
+          console.error('Error fetching La Liga:', error);
+        } finally {
+          setIsLoadingLaLiga(false);
+        }
+      };
+
+      useEffect(() => {
+        if (activeTab === 'laliga' && laLigaMatches.length === 0) {
+          fetchLaLigaMatches();
+        }
+      }, [activeTab]);
+
+      const handleSetBankroll = () => {
+        const val = parseFloat(initialCapital);
+        if (!isNaN(val) && val > 0) setCurrentBankroll(val);
+      };
+
+      const handlePlaceBet = (opp, customStake) => {
+        const stake = parseFloat(customStake) || parseFloat(userStakeInput);
+        
+        if (currentBankroll < stake) {
+          alert('Insufficient bankroll for this bet!');
+          return;
+        }
+        
+        const newBet = {
+          id: Date.now(),
+          oppId: opp.id,
+          event: opp.event,
+          league: opp.league,
+          selection: opp.selection,
+          type: opp.type || 'Market Analysis',
+          bookie: opp.bookie,
+          odds: opp.odds,
+          stake: stake,
+          potentialReturn: (stake * opp.odds).toFixed(2),
+          profit: ((stake * opp.odds) - stake).toFixed(2),
+          confidence: opp.confidence,
+          placedAt: new Date().toISOString(),
+          status: 'pending'
+        };
+        
+        const updatedPlacedBets = [...placedBets, newBet];
+        const updatedBankroll = currentBankroll - stake;
+        
+        setPlacedBets(updatedPlacedBets);
+        setCurrentBankroll(updatedBankroll);
+      };
+
+      const handleUpdateOdds = (betId, newOdds) => {
+        const updatedBets = placedBets.map(bet => {
+          if (bet.id === betId) {
+            const updatedPotentialReturn = (bet.stake * newOdds).toFixed(2);
+            const updatedProfit = (updatedPotentialReturn - bet.stake).toFixed(2);
+            return {
+              ...bet,
+              odds: newOdds,
+              potentialReturn: updatedPotentialReturn,
+              profit: updatedProfit
+            };
+          }
+          return bet;
+        });
+        
+        setPlacedBets(updatedBets);
+      };
+
+      const handleSettleBet = (betId, won) => {
+        const bet = placedBets.find(b => b.id === betId);
+        if (!bet) return;
+
+        const settledBet = {
+          ...bet,
+          status: won ? 'won' : 'lost',
+          settledAt: new Date().toISOString(),
+          actualReturn: won ? parseFloat(bet.potentialReturn) : 0
+        };
+
+        setSettledBets([...settledBets, settledBet]);
+        setPlacedBets(placedBets.filter(b => b.id !== betId));
+        
+        if (won) {
+          setCurrentBankroll(prev => prev + parseFloat(bet.potentialReturn));
+        }
+      };
+
+      const calculateStats = () => {
+        const totalBets = settledBets.length;
+        const wonBets = settledBets.filter(b => b.status === 'won').length;
+        const totalStaked = settledBets.reduce((sum, b) => sum + b.stake, 0);
+        const totalReturns = settledBets.reduce((sum, b) => sum + b.actualReturn, 0);
+        const netProfit = totalReturns - totalStaked;
+        const winRate = totalBets > 0 ? ((wonBets / totalBets) * 100).toFixed(1) : 0;
+
+        return { totalBets, wonBets, totalStaked, totalReturns, netProfit, winRate };
+      };
+
+      const OpportunityCard = ({ opp }) => {
+        const [customStake, setCustomStake] = useState('');
+        const [isPlacing, setIsPlacing] = useState(false);
+        const [isExpanded, setIsExpanded] = useState(false);
+        const stakeToUse = customStake || userStakeInput;
+        const potReturn = (stakeToUse * opp.odds).toFixed(2);
+        const profit = (potReturn - stakeToUse).toFixed(2);
+        const alreadyPlaced = placedBets.some(b => b.oppId === opp.id);
+        const isHighConfidence = opp.confidence >= 90;
+
+        return (
+          <div className={`bg-slate-900 border rounded-3xl flex flex-col hover:border-blue-500/50 transition-all shadow-xl ${
+            isHighConfidence ? 'border-emerald-500/40 ring-2 ring-emerald-500/20' : 'border-slate-800'
+          }`}>
+            <div 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-6 cursor-pointer"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      {opp.type}
+                    </span>
+                    {isHighConfidence && (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        ⭐ HIGH CONFIDENCE
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-1">{opp.event}</h3>
+                  <p className="text-xs text-blue-400 font-bold mb-2">{opp.league}</p>
+                  <p className="text-sm text-slate-300 font-bold">{opp.selection} @ {opp.odds}</p>
+                </div>
+                <div className="text-right ml-4">
+                  <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-widest">Confidence</span>
+                  <span className={`text-2xl font-black ${isHighConfidence ? 'text-emerald-400' : 'text-white'}`}>
+                    {opp.confidence}%
                   </span>
-                )}
-              </p>
-            </header>
-
-            {/* Loading State */}
-            {isLoading && (
-              <div className="text-center py-20">
-                <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-slate-400 font-bold">Fetching live UK matches...</p>
-                <p className="text-slate-600 text-sm mt-2">This may take 10-30 seconds</p>
-              </div>
-            )}
-
-            {/* Error State */}
-            {error && !isLoading && (
-              <div className="text-center py-20 bg-red-500/5 border-2 border-dashed border-red-500/20 rounded-[3rem]">
-                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6 mx-auto">
-                  <Info className="text-red-500" size={32} />
+                  <div className="mt-2 text-slate-500">
+                    {isExpanded ? '▼' : '▶'}
+                  </div>
                 </div>
-                <h3 className="text-2xl font-black text-white mb-2">No Matches Found</h3>
-                <p className="text-slate-400 max-w-lg mx-auto font-medium mb-6 px-4">
-                  {error}
-                </p>
-                <button
-                  onClick={fetchAllMatches}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
-                >
-                  RETRY FETCH
-                </button>
               </div>
-            )}
+            </div>
 
-            {/* Empty State (no error, not loading, no data) */}
-            {!isLoading && !error && opportunities.length === 0 && (
-              <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
-                  <Zap className="text-slate-600" size={32} />
+            {isExpanded && (
+              <div className="px-6 pb-6 animate-in">
+                <div className="flex items-center gap-2 mb-4 text-xs text-slate-400 bg-slate-800/50 w-fit px-3 py-1.5 rounded-lg border border-slate-700">
+                  <Users size={14} className="text-blue-400" />
+                  <span className="font-bold">{opp.customerType}</span>
                 </div>
-                <h3 className="text-2xl font-black text-white mb-2">Ready to Fetch</h3>
-                <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
-                  Click "FETCH UK MATCHES" to load live betting opportunities from The Odds API
-                </p>
-              </div>
-            )}
 
-            {/* Results */}
-            {!isLoading && opportunities.length > 0 && (
-              <>
-                <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
-                  <h3 className="text-lg font-black text-emerald-400 mb-2">
-                    ✅ {opportunities.length} Matches Found
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Showing all UK matches in the next 2 days with confidence scores
+                <div className="grid grid-cols-1 gap-3 mb-4">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Bookmaker</p>
+                      <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1">
+                        Visit Site <ArrowUpRight size={10}/>
+                      </a>
+                    </div>
+                    <p className="text-sm font-bold text-white">{opp.bookie} @ <span className="text-blue-400">{opp.odds}</span></p>
+                  </div>
+                </div>
+
+                <div className="mb-4 space-y-3">
+                  <div className="p-3 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                    <p className="text-[10px] text-blue-400 font-black uppercase mb-1">Strategy</p>
+                    <p className="text-xs text-slate-400 italic leading-relaxed font-medium">"{opp.strategy}"</p>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                    <span className="text-slate-300 font-bold">Analysis:</span> {opp.reasoning}
                   </p>
                 </div>
 
-                {/* Group by league */}
-                {UK_LEAGUES.map(league => {
-                  const leagueMatches = opportunities.filter(o => o.league === league.name);
-                  
-                  if (leagueMatches.length === 0) return null;
-                  
-                  return (
-                    <div key={league.key} className="mb-12">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="h-px flex-1 bg-slate-800"></div>
-                        <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20">
-                          {league.name} ({leagueMatches.length})
-                        </h4>
-                        <div className="h-px flex-1 bg-slate-800"></div>
+                {!alreadyPlaced && (
+                  <div className="mb-4 p-4 bg-slate-950 rounded-2xl border border-slate-700">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Custom Stake (Optional)</p>
+                    <div className="flex items-center">
+                      <span className="text-lg font-black text-slate-500 mr-1">£</span>
+                      <input 
+                        type="number"
+                        placeholder={userStakeInput}
+                        className="bg-transparent text-lg font-bold text-white w-full focus:outline-none"
+                        value={customStake}
+                        onChange={(e) => setCustomStake(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-auto pt-4 border-t border-slate-800">
+                  {alreadyPlaced ? (
+                    <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                      <CheckSquare size={20} className="text-emerald-400" />
+                      <span className="text-sm font-bold text-emerald-400">Bet Placed - Track in History</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center mb-4">
+                        <div>
+                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase">Est. Return</p>
+                          <p className="text-2xl font-black text-emerald-400">£{potReturn}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase">Net Profit</p>
+                          <p className="text-lg font-bold text-white">£{profit}</p>
+                        </div>
                       </div>
-                      
-                      <div className="grid gap-4">
-                        {leagueMatches.map(match => (
-                          <div 
-                            key={match.id} 
-                            className={`bg-slate-900 border rounded-2xl p-6 hover:border-blue-500/50 transition-all ${
-                              match.confidence >= 90 ? 'border-emerald-500/40 ring-2 ring-emerald-500/20' : 'border-slate-800'
-                            }`}
-                          >
-                            <div className="flex flex-col md:flex-row justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                  {match.confidence >= 90 && (
-                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                      ⭐ HIGH CONFIDENCE
-                                    </span>
-                                  )}
-                                  {match.isToday && (
-                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                                      ⚡ TODAY
-                                    </span>
-                                  )}
-                                  {match.isLive && (
-                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                                      🔴 LIVE
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                <h3 className="text-xl font-bold text-white mb-2">{match.event}</h3>
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                  <div>
-                                    <p className="text-slate-500 text-[10px] uppercase mb-1">Prediction</p>
-                                    <p className="text-white font-bold">{match.selection}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-slate-500 text-[10px] uppercase mb-1">Odds</p>
-                                    <p className="text-emerald-400 font-bold">{match.odds}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-slate-500 text-[10px] uppercase mb-1">Confidence</p>
-                                    <p className="text-white font-bold">{match.confidence}%</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-slate-500 text-[10px] uppercase mb-1">Score</p>
-                                    <p className="text-blue-400 font-bold">{match.predictedScore}</p>
-                                  </div>
-                                </div>
+                      <button
+                        onClick={() => {
+                          setIsPlacing(true);
+                          setTimeout(() => {
+                            handlePlaceBet(opp, customStake);
+                            setIsPlacing(false);
+                          }, 500);
+                        }}
+                        disabled={isPlacing || currentBankroll < stakeToUse}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-2xl font-black text-sm transition-all active:scale-95"
+                      >
+                        {isPlacing ? 'PLACING...' : currentBankroll < stakeToUse ? 'INSUFFICIENT BANKROLL' : 'PLACE BET'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
 
-                                <div className="mt-3 pt-3 border-t border-slate-800">
-                                  <p className="text-xs text-slate-400">
-                                    <span className="text-slate-300 font-bold">Bookmaker:</span> {match.bookie}
-                                  </p>
-                                  <p className="text-xs text-slate-400 mt-1">
-                                    <span className="text-slate-300 font-bold">Kick-off:</span> {new Date(match.commence_time).toLocaleString()}
-                                  </p>
-                                </div>
+      const stats = calculateStats();
+
+      // Get top 3 non-live bets
+      const topNonLiveBets = opportunities.filter(o => !o.isLive).slice(0, 3);
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-200">
+          
+          <nav className="fixed top-0 left-0 right-0 h-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800 z-50 px-6 lg:px-12 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-600/20">
+                <Shield className="text-white" size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v3.0</p>
+              </div>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-2">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                { id: 'laliga', label: 'La Liga', icon: TrendingUp },
+                { id: 'history', label: 'Bet History', icon: History }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                  <tab.icon size={16} /> {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button className="lg:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X /> : <Menu />}
+            </button>
+          </nav>
+
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 top-20 bg-slate-950 z-40 p-6 flex flex-col gap-4 lg:hidden">
+              {['dashboard', 'laliga', 'history'].map(id => (
+                <button
+                  key={id}
+                  onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+                  className={`w-full p-4 rounded-2xl text-left font-bold capitalize ${activeTab === id ? 'bg-blue-600' : 'bg-slate-900'}`}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <main className="pt-28 pb-12 px-6 lg:px-12 max-w-[1600px] mx-auto">
+            
+            {activeTab === 'dashboard' && (
+              <div className="animate-in">
+                <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
+                    <p className="text-slate-500 font-medium">
+                      Real-time UK & European Market Analysis
+                      {lastDataFetch && (
+                        <span className="ml-2 text-xs">
+                          • Last updated: {lastDataFetch.toLocaleTimeString()}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={fetchLiveOpportunities}
+                    disabled={isLoadingOpportunities}
+                    className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 flex items-center gap-2"
+                  >
+                    {isLoadingOpportunities ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        LOADING...
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={16} className="fill-current" />
+                        REFRESH DATA
+                      </>
+                    )}
+                  </button>
+                </header>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Current Bankroll</p>
+                    <div className="flex items-center">
+                      <span className="text-2xl font-black text-slate-500 mr-1">£</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="bg-transparent text-3xl font-black text-white w-full focus:outline-none"
+                        value={currentBankroll}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setCurrentBankroll(val);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Total P/L</p>
+                    <h4 className={`text-3xl font-black ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      £{stats.netProfit.toFixed(2)}
+                    </h4>
+                  </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-slate-800 shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2 tracking-widest">Win Rate</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <TrendingUp className="text-emerald-500" size={16} />
+                      <span className="text-2xl font-bold text-white">{stats.winRate}%</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{stats.wonBets}/{stats.totalBets} wins</p>
+                  </div>
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border-2 border-blue-500/30 shadow-2xl bg-gradient-to-br from-slate-900 to-blue-900/10">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Default Stake</p>
+                      <Calculator size={14} className="text-blue-400" />
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-2xl font-black text-slate-500 mr-1">£</span>
+                      <input 
+                        type="number"
+                        className="bg-transparent text-3xl font-black text-white w-full focus:outline-none"
+                        value={userStakeInput}
+                        onChange={(e) => setUserStakeInput(parseFloat(e.target.value) || 10)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Initialize Bankroll */}
+                {currentBankroll === 0 && (
+                  <div className="mb-12 p-8 bg-blue-500/5 border-2 border-blue-500/20 rounded-[2rem]">
+                    <h3 className="text-lg font-black text-blue-400 mb-4">Set Your Initial Bankroll</h3>
+                    <div className="flex gap-3">
+                      <div className="flex-1 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                        <div className="flex items-center gap-3 px-4">
+                          <Wallet className="text-blue-400" size={20} />
+                          <input 
+                            type="number"
+                            placeholder="Enter Initial Bankroll (e.g., 1000)"
+                            className="bg-transparent border-none text-white font-black text-lg focus:outline-none w-full placeholder:text-slate-700"
+                            value={initialCapital}
+                            onChange={(e) => setInitialCapital(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        onClick={handleSetBankroll}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-xl font-black text-sm transition-all"
+                      >
+                        SET BANKROLL
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top 3 Best Bets (Non-Live) */}
+                {topNonLiveBets.length > 0 && (
+                  <div className="mb-12">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
+                      <Zap size={16} className="text-emerald-400 fill-emerald-400" /> BEST 3 UPCOMING BETS
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {topNonLiveBets.map(opp => (
+                        <div key={opp.id} className="bg-gradient-to-br from-slate-900 to-emerald-900/20 border-2 border-emerald-500/30 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group hover:border-emerald-500 transition-all">
+                          <div className="absolute top-0 right-0 p-6">
+                            <Zap size={32} className="text-emerald-500/10 group-hover:text-emerald-500/30 transition-all" />
+                          </div>
+                          <p className="text-[10px] text-emerald-400 font-black uppercase mb-2 tracking-[0.2em]">{opp.league}</p>
+                          <h4 className="text-xl font-black text-white mb-1 truncate">{opp.event}</h4>
+                          <p className="text-sm text-slate-400 mb-6">{opp.selection} @ <span className="text-emerald-400 font-bold">{opp.odds}</span></p>
+                          <div className="flex justify-between items-end">
+                            <div>
+                              <p className="text-[9px] text-slate-500 uppercase font-black mb-1 tracking-widest">Confidence</p>
+                              <p className="text-3xl font-black text-white">{opp.confidence}%</p>
+                            </div>
+                            <button
+                              onClick={() => handlePlaceBet(opp)}
+                              disabled={currentBankroll < userStakeInput}
+                              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
+                            >
+                              PLACE BET
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pending Bets */}
+                {placedBets.length > 0 && (
+                  <div className="mb-12">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
+                      <CheckSquare size={16} className="text-amber-400" /> Pending Bets ({placedBets.length})
+                    </h3>
+                    <div className="grid gap-4">
+                      {placedBets.map(bet => (
+                        <div key={bet.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="flex-1">
+                            <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
+                            <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
+                            <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
+                              <span>Stake: <b className="text-white">£{bet.stake}</b></span>
+                              <div className="flex items-center gap-2">
+                                <span>Odds:</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={bet.odds}
+                                  onChange={(e) => handleUpdateOdds(bet.id, parseFloat(e.target.value))}
+                                  className="bg-slate-950 border border-slate-700 rounded px-2 py-1 w-20 text-white font-bold text-xs focus:outline-none focus:border-blue-500"
+                                />
                               </div>
+                              <span>Return: <b className="text-emerald-400">£{bet.potentialReturn}</b></span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSettleBet(bet.id, true)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                            >
+                              WON
+                            </button>
+                            <button
+                              onClick={() => handleSettleBet(bet.id, false)}
+                              className="bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all"
+                            >
+                              LOST
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                              <div className="flex flex-col justify-between items-end gap-3">
-                                <div className="text-right">
-                                  <p className="text-[9px] text-slate-500 uppercase mb-1">Strategy</p>
-                                  <p className="text-sm font-bold text-blue-400">{match.strategy}</p>
+                {/* All Recommendations */}
+                <div className="mb-12">
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
+                    <Zap className="text-amber-400 fill-amber-400" size={16} /> 
+                    All Recommendations ({opportunities.length})
+                  </h3>
+                  
+                  {isLoadingOpportunities ? (
+                    <div className="text-center py-20">
+                      <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-slate-400 font-bold">Fetching opportunities...</p>
+                    </div>
+                  ) : opportunities.length === 0 ? (
+                    <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                      <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
+                        <Zap className="text-slate-600" size={32} />
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2">No Opportunities</h3>
+                      <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                        Click "REFRESH DATA" to fetch the latest opportunities
+                      </p>
+                      <button
+                        onClick={fetchLiveOpportunities}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                      >
+                        REFRESH DATA NOW
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {opportunities.map(opp => (
+                        <OpportunityCard key={opp.id} opp={opp} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'laliga' && (
+              <div className="animate-in">
+                <header className="flex justify-between items-center mb-12">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
+                    <p className="text-slate-500 font-medium">Upcoming matches with predictions</p>
+                  </div>
+                  <button
+                    onClick={fetchLaLigaMatches}
+                    disabled={isLoadingLaLiga}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all flex items-center gap-2"
+                  >
+                    {isLoadingLaLiga ? 'LOADING...' : 'REFRESH'}
+                  </button>
+                </header>
+
+                {isLoadingLaLiga ? (
+                  <div className="text-center py-20">
+                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold">Fetching matches...</p>
+                  </div>
+                ) : laLigaMatches.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
+                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
+                      <TrendingUp className="text-slate-600" size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2">No Upcoming Matches</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium mb-6">
+                      No Real Madrid or Barcelona matches in the next 7 days
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-8">
+                    {laLigaMatches.map(match => (
+                      <div key={match.id} className={`bg-slate-900 border rounded-3xl p-8 ${
+                        match.isElClasico ? 'border-red-500 ring-2 ring-red-500/30' : 'border-blue-500/50'
+                      }`}>
+                        {match.isElClasico && (
+                          <div className="bg-gradient-to-r from-red-600 to-blue-600 text-white text-sm font-black px-6 py-3 rounded-t-2xl -mx-8 -mt-8 mb-6 text-center uppercase">
+                            ⚽ EL CLÁSICO ⚽
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-2xl font-black text-white">{match.event}</h3>
+                          <span className="text-sm text-slate-400">
+                            {new Date(match.commence_time).toLocaleDateString()} at {new Date(match.commence_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30 rounded-2xl p-6 mb-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="bg-blue-500 p-2 rounded-lg">
+                              <TrendingUp size={20} className="text-white" />
+                            </div>
+                            <h4 className="text-lg font-black text-white">AI PREDICTION</h4>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Predicted Score</p>
+                              <p className="text-3xl font-black text-emerald-400">{match.predictedScore}</p>
+                            </div>
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Confidence</p>
+                              <p className="text-3xl font-black text-blue-400">{match.scoreConfidence}%</p>
+                            </div>
+                            <div className="bg-slate-950/50 rounded-xl p-4 text-center">
+                              <p className="text-xs text-slate-400 uppercase mb-2">Best Odds</p>
+                              <p className="text-3xl font-black text-amber-400">
+                                {match.odds && match.odds.length > 0 ? match.odds[0].homeOdds.toFixed(2) : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {match.reasoning && (
+                          <div className="bg-slate-950/50 rounded-2xl p-6 mb-6">
+                            <p className="text-xs text-slate-500 uppercase font-black mb-2">Analysis</p>
+                            <p className="text-sm text-slate-300 leading-relaxed">{match.reasoning}</p>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => {
+                              const mOdds = match.odds?.[0];
+                              let bestOdds = 1.80;
+
+                              if (mOdds) {
+                                if (match.selection === 'Away Win') bestOdds = mOdds.awayOdds;
+                                else if (match.selection === 'Draw') bestOdds = mOdds.drawOdds;
+                                else bestOdds = mOdds.homeOdds;
+                              }
+
+                              const betData = {
+                                id: match.id,
+                                event: match.event,
+                                league: 'La Liga',
+                                selection: match.selection || 'Home Win',
+                                odds: bestOdds,
+                                confidence: match.scoreConfidence || match.confidence,
+                                type: 'La Liga Special',
+                                bookie: mOdds?.bookie || 'Live Market'
+                              };
+                              handlePlaceBet(betData);
+                            }}
+                            disabled={currentBankroll < userStakeInput}
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all active:scale-95 flex items-center gap-2"
+                          >
+                            <Zap size={16} className="fill-current" />
+                            PLACE BET ON PREDICTION
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'history' && (
+              <div className="animate-in">
+                {settledBets.length === 0 ? (
+                  <div className="text-center py-40">
+                    <div className="p-6 bg-slate-900 rounded-full w-fit mx-auto mb-6">
+                      <History className="text-slate-700" size={40} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2 tracking-tight uppercase italic">No History Found</h3>
+                    <p className="text-slate-500 max-w-sm mx-auto font-medium">
+                      Bet history will populate once you place and settle bets from the dashboard.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <header className="mb-8">
+                      <h2 className="text-3xl font-black text-white mb-2">Bet History</h2>
+                      <p className="text-slate-500">Complete record of all settled bets</p>
+                    </header>
+
+                    <div className="grid gap-4">
+                      {settledBets.map(bet => (
+                        <div key={bet.id} className={`bg-slate-900 border rounded-2xl p-6 ${bet.status === 'won' ? 'border-emerald-500/30' : 'border-red-500/30'}`}>
+                          <div className="flex flex-col md:flex-row justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${bet.status === 'won' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {bet.status.toUpperCase()}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  {new Date(bet.settledAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
+                              <p className="text-xs text-blue-400 font-bold mb-3">{bet.league} • {bet.selection}</p>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Stake</p>
+                                  <p className="text-white font-bold">£{bet.stake.toFixed(2)}</p>
                                 </div>
-                                
-                                <a 
-                                  href={match.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl text-xs font-black transition-all"
-                                >
-                                  VIEW ODDS
-                                </a>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Odds</p>
+                                  <p className="text-white font-bold">{bet.odds}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Return</p>
+                                  <p className="text-white font-bold">£{bet.actualReturn.toFixed(2)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500 uppercase text-[10px] mb-1">Profit</p>
+                                  <p className={`font-bold ${bet.status === 'won' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    £{(bet.actualReturn - bet.stake).toFixed(2)}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
-              </>
+                  </div>
+                )}
+              </div>
             )}
           </main>
         </div>
