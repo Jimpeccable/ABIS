@@ -152,7 +152,7 @@
         const timeout = setTimeout(() => {
           cleanup();
           reject(new Error('Request timeout'));
-        }, 60000);
+        }, 120000);
         
         window[cbName] = (data) => {
           clearTimeout(timeout);
@@ -281,8 +281,10 @@
       const [opportunities, setOpportunities] = useState([]);
       const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
       const [lastDataFetch, setLastDataFetch] = useState(null);
+      const [oppsError, setOppsError] = useState(null);
       const [laLigaMatches, setLaLigaMatches] = useState([]);
       const [isLoadingLaLiga, setIsLoadingLaLiga] = useState(false);
+      const [laLigaError, setLaLigaError] = useState(null);
 
       // Fetch live opportunities from The Odds API via Google Sheets Web App
       const fetchLiveOpportunities = async () => {
@@ -292,19 +294,24 @@
         }
 
         setIsLoadingOpportunities(true);
+        setOppsError(null);
         
         try {
           const data = await jsonp(webAppUrl, { action: 'getRecommendations' });
           
           if (data.status === 'ok' && data.recommendations) {
-            // Sort by confidence (highest first)
             const sorted = data.recommendations.sort((a, b) => b.confidence - a.confidence);
             setOpportunities(sorted);
             setLastDataFetch(new Date());
             console.log('✅ Loaded', data.recommendations.length, 'live opportunities');
+          } else if (data.status === 'error') {
+            setOppsError(data.message);
           }
         } catch (error) {
           console.error('Failed to fetch opportunities:', error);
+          setOppsError(error.message === 'Request timeout'
+            ? 'The request timed out. This often happens on the first load as the backend initializes and fetches data from multiple APIs. Please try refreshing again.'
+            : 'Failed to fetch data: ' + error.message);
         } finally {
           setIsLoadingOpportunities(false);
         }
@@ -318,6 +325,7 @@
         }
 
         setIsLoadingLaLiga(true);
+        setLaLigaError(null);
         
         try {
           const data = await jsonp(webAppUrl, { action: 'getElClasico' });
@@ -325,9 +333,12 @@
           if (data.status === 'ok' && data.matches) {
             setLaLigaMatches(data.matches);
             console.log('✅ Loaded', data.matches.length, 'La Liga matches');
+          } else if (data.status === 'error') {
+            setLaLigaError(data.message);
           }
         } catch (error) {
           console.error('Failed to fetch La Liga matches:', error);
+          setLaLigaError('Failed to fetch La Liga data: ' + error.message);
         } finally {
           setIsLoadingLaLiga(false);
         }
@@ -460,10 +471,10 @@
  */
 
 const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
-const ODDS_API_KEY = "0d7491630a8624fe87ea1da0dad2ea3f";
-const FOOTBALL_DATA_TOKEN = "cf8c5dca8e00408bb3303906e89a54a0";
-const API_FOOTBALL_KEY = "ad3bee407db9f5221c7965ef2055f174";
-const START_BAL = 5;
+const ODDS_API_KEY = "YOUR_ODDS_API_KEY_HERE";
+const FOOTBALL_DATA_TOKEN = "YOUR_FOOTBALL_DATA_TOKEN_HERE";
+const API_FOOTBALL_KEY = "YOUR_API_FOOTBALL_KEY_HERE";
+const START_BAL = ${currentBankroll || 5};
 const MANUAL_SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE";
 
 function getActiveSheet() {
@@ -673,15 +684,38 @@ function analyzeMatch(event, homeOdds, awayOdds, drawOdds, standings) {
 }
 
 function fetchOdds(sport) {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('odds_' + sport);
+  if (cached) return JSON.parse(cached);
+
   const url = 'https://api.the-odds-api.com/v4/sports/' + sport + '/odds/?apiKey=' + ODDS_API_KEY + '&regions=uk&markets=h2h&oddsFormat=decimal';
   const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  return response.getResponseCode() === 200 ? JSON.parse(response.getContentText()) : [];
+  if (response.getResponseCode() === 200) {
+    const data = JSON.parse(response.getContentText());
+    if (data && data.length > 0) {
+      try { cache.put('odds_' + sport, JSON.stringify(data), 300); } catch (e) {}
+    }
+    return data;
+  }
+  return [];
 }
 
 function getStandings(leagueId) {
+  if (!leagueId) return null;
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('standings_' + leagueId);
+  if (cached) return JSON.parse(cached);
+
   const url = 'https://api.football-data.org/v4/competitions/' + leagueId + '/standings';
   const response = UrlFetchApp.fetch(url, { headers: { 'X-Auth-Token': FOOTBALL_DATA_TOKEN }, muteHttpExceptions: true });
-  return response.getResponseCode() === 200 ? JSON.parse(response.getContentText()).standings?.[0]?.table : null;
+  if (response.getResponseCode() === 200) {
+    const data = JSON.parse(response.getContentText()).standings?.[0]?.table;
+    if (data) {
+      try { cache.put('standings_' + leagueId, JSON.stringify(data), 21600); } catch (e) {}
+    }
+    return data;
+  }
+  return null;
 }
 
 function updateRecommendationsSheet(recommendations) {
@@ -1265,6 +1299,22 @@ function viewPLSummary() {
                           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                           <p className="text-slate-400 font-bold">Fetching live opportunities...</p>
                         </div>
+                      ) : oppsError ? (
+                        <div className="text-center py-20 bg-red-500/5 border-2 border-dashed border-red-500/20 rounded-[3rem]">
+                          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6 mx-auto">
+                            <Info className="text-red-500" size={32} />
+                          </div>
+                          <h3 className="text-2xl font-black text-white mb-2">Sync Error</h3>
+                          <p className="text-slate-400 max-w-lg mx-auto font-medium mb-6 px-4">
+                            {oppsError}
+                          </p>
+                          <button
+                            onClick={fetchLiveOpportunities}
+                            className="bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                          >
+                            RETRY FETCH
+                          </button>
+                        </div>
                       ) : opportunities.length === 0 ? (
                         <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
                           <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 mx-auto">
@@ -1605,6 +1655,22 @@ function viewPLSummary() {
                   <div className="text-center py-20">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-slate-400 font-bold">Fetching matches...</p>
+                  </div>
+                ) : laLigaError ? (
+                  <div className="text-center py-20 bg-red-500/5 border-2 border-dashed border-red-500/20 rounded-[3rem]">
+                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6 mx-auto">
+                      <Info className="text-red-500" size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black text-white mb-2">Sync Error</h3>
+                    <p className="text-slate-400 max-w-lg mx-auto font-medium mb-6 px-4">
+                      {laLigaError}
+                    </p>
+                    <button
+                      onClick={fetchLaLigaMatches}
+                      className="bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all"
+                    >
+                      RETRY FETCH
+                    </button>
                   </div>
                 ) : laLigaMatches.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
