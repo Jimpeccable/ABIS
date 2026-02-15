@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - UK Intelligence v3.0</title>
+  <title>ABIS Live - Enhanced Confidence v3.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes fadeIn {
@@ -25,7 +25,7 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // Lucide Icons
+    // Lucide Icons (same as before)
     const Shield = ({className, size=24}) => (
       <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -104,6 +104,60 @@
       </svg>
     );
 
+    const Target = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+      </svg>
+    );
+
+    // ============================================================================
+    // SMART CACHE MANAGER - Protects API Quota
+    // ============================================================================
+    class SmartCache {
+      constructor() {
+        this.prefix = 'abis_cache_';
+      }
+
+      set(key, data, ttlMinutes = 60) {
+        const item = {
+          data: data,
+          expires: Date.now() + (ttlMinutes * 60 * 1000)
+        };
+        try {
+          localStorage.setItem(this.prefix + key, JSON.stringify(item));
+        } catch (e) {
+          console.warn('Cache storage failed:', e);
+        }
+      }
+
+      get(key) {
+        try {
+          const item = localStorage.getItem(this.prefix + key);
+          if (!item) return null;
+          
+          const parsed = JSON.parse(item);
+          if (Date.now() > parsed.expires) {
+            localStorage.removeItem(this.prefix + key);
+            return null;
+          }
+          
+          return parsed.data;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      clear(pattern) {
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(this.prefix + pattern)) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    }
+
+    const cache = new SmartCache();
+
     const App = () => {
       const [activeTab, setActiveTab] = useState('dashboard');
       const [initialCapital, setInitialCapital] = useState("");
@@ -125,45 +179,46 @@
         return saved ? JSON.parse(saved) : [];
       });
 
-      // State for live opportunities
       const [opportunities, setOpportunities] = useState([]);
       const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
       const [lastDataFetch, setLastDataFetch] = useState(null);
       const [oppsError, setOppsError] = useState(null);
       const [laLigaMatches, setLaLigaMatches] = useState([]);
       const [isLoadingLaLiga, setIsLoadingLaLiga] = useState(false);
+      const [apiUsage, setApiUsage] = useState({ oddsAPI: 0, footballData: 0 });
 
       // API Configuration
       const API_KEYS = {
         primary: "0d7491630a8624fe87ea1da0dad2ea3f",
-        backup: "64a74abb6980d161caf1ab8ff856dea9"
+        backup: "64a74abb6980d161caf1ab8ff856dea9",
+        footballData: "ad3bee407db9f5221c7965ef2055f174"
       };
 
-      // All Leagues
+      // League Configuration with Football-Data.org IDs
       const LEAGUES = {
         uk: [
-          { key: 'soccer_epl', name: 'Premier League' },
-          { key: 'soccer_efl_champ', name: 'Championship' },
-          { key: 'soccer_england_league1', name: 'League One' },
-          { key: 'soccer_england_league2', name: 'League Two' },
-          { key: 'soccer_fa_cup', name: 'FA Cup' },
-          { key: 'soccer_england_efl_cup', name: 'EFL Cup' },
-          { key: 'soccer_spl', name: 'Scottish Premiership' },
-          { key: 'soccer_england_national_league', name: 'National League' }
+          { key: 'soccer_epl', name: 'Premier League', fdId: 2021 },
+          { key: 'soccer_efl_champ', name: 'Championship', fdId: 2016 },
+          { key: 'soccer_england_league1', name: 'League One', fdId: 2030 },
+          { key: 'soccer_england_league2', name: 'League Two', fdId: 2054 },
+          { key: 'soccer_fa_cup', name: 'FA Cup', fdId: 2055 },
+          { key: 'soccer_england_efl_cup', name: 'EFL Cup', fdId: 2139 },
+          { key: 'soccer_spl', name: 'Scottish Premiership', fdId: 2084 },
+          { key: 'soccer_england_national_league', name: 'National League', fdId: 2053 }
         ],
         europe: [
-          { key: 'soccer_spain_la_liga', name: 'La Liga' },
-          { key: 'soccer_germany_bundesliga', name: 'Bundesliga' },
-          { key: 'soccer_italy_serie_a', name: 'Serie A' },
-          { key: 'soccer_france_ligue_one', name: 'Ligue 1' },
-          { key: 'soccer_netherlands_eredivisie', name: 'Eredivisie' },
-          { key: 'soccer_portugal_primeira_liga', name: 'Primeira Liga' },
-          { key: 'soccer_belgium_first_div', name: 'Jupiler Pro League' },
-          { key: 'soccer_turkey_super_league', name: 'Süper Lig' }
+          { key: 'soccer_spain_la_liga', name: 'La Liga', fdId: 2014 },
+          { key: 'soccer_germany_bundesliga', name: 'Bundesliga', fdId: 2002 },
+          { key: 'soccer_italy_serie_a', name: 'Serie A', fdId: 2019 },
+          { key: 'soccer_france_ligue_one', name: 'Ligue 1', fdId: 2015 },
+          { key: 'soccer_netherlands_eredivisie', name: 'Eredivisie', fdId: 2003 },
+          { key: 'soccer_portugal_primeira_liga', name: 'Primeira Liga', fdId: 2017 },
+          { key: 'soccer_belgium_first_div', name: 'Jupiler Pro League', fdId: 2009 },
+          { key: 'soccer_turkey_super_league', name: 'Süper Lig', fdId: 2070 }
         ]
       };
 
-      // Save to localStorage whenever data changes
+      // Save to localStorage
       useEffect(() => {
         if (currentBankroll >= 0) {
           localStorage.setItem('abis_bankroll', currentBankroll.toString());
@@ -182,13 +237,30 @@
         localStorage.setItem('abis_settled_bets', JSON.stringify(settledBets));
       }, [settledBets]);
 
-      const fetchDirectOdds = async (sport, apiKey) => {
+      // ============================================================================
+      // ENHANCED API FETCHERS WITH QUOTA PROTECTION
+      // ============================================================================
+
+      const fetchDirectOdds = async (sport, apiKey, useCache = true) => {
+        // Check cache first (10 min TTL)
+        if (useCache) {
+          const cached = cache.get(`odds_${sport}`);
+          if (cached) {
+            console.log(`✓ Using cached odds for ${sport}`);
+            return cached;
+          }
+        }
+
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=uk&markets=h2h&oddsFormat=decimal`;
         
         try {
           const response = await fetch(url);
+          setApiUsage(prev => ({ ...prev, oddsAPI: prev.oddsAPI + 1 }));
+          
           if (response.ok) {
-            return await response.json();
+            const data = await response.json();
+            cache.set(`odds_${sport}`, data, 10); // Cache for 10 minutes
+            return data;
           } else if (response.status === 429) {
             console.log('Rate limit hit');
             return null;
@@ -202,8 +274,216 @@
         }
       };
 
-      const analyzeMatch = (event, leagueName) => {
-        const bookmaker = event.bookmakers?.[0];
+      const fetchStandings = async (leagueId) => {
+        if (!leagueId) return null;
+
+        // Check cache first (6 hour TTL - standings change slowly)
+        const cached = cache.get(`standings_${leagueId}`);
+        if (cached) {
+          console.log(`✓ Using cached standings for league ${leagueId}`);
+          return cached;
+        }
+
+        const url = `https://api.football-data.org/v4/competitions/${leagueId}/standings`;
+        
+        try {
+          const response = await fetch(url, {
+            headers: { 'X-Auth-Token': API_KEYS.footballData }
+          });
+          
+          setApiUsage(prev => ({ ...prev, footballData: prev.footballData + 1 }));
+
+          if (response.ok) {
+            const data = await response.json();
+            const table = data.standings?.[0]?.table;
+            if (table) {
+              cache.set(`standings_${leagueId}`, table, 360); // Cache for 6 hours
+              return table;
+            }
+          }
+          return null;
+        } catch (err) {
+          console.error(`Standings fetch error:`, err);
+          return null;
+        }
+      };
+
+      // ============================================================================
+      // ENHANCED CONFIDENCE CALCULATION - Multi-Factor Analysis
+      // ============================================================================
+
+      const calculateEnhancedConfidence = (event, homeOdds, awayOdds, drawOdds, standings, allBookmakers) => {
+        let confidence = 70; // Base confidence
+        let factors = [];
+
+        // FACTOR 1: Implied Probability (30% weight)
+        const homeProb = (1 / homeOdds) * 100;
+        const awayProb = (1 / awayOdds) * 100;
+        const drawProb = (1 / drawOdds) * 100;
+
+        let bestProb = Math.max(homeProb, awayProb, drawProb);
+        let oddsConfidence = Math.min(30, bestProb * 0.3);
+        confidence += oddsConfidence;
+        factors.push({ name: 'Market Odds', value: oddsConfidence.toFixed(1), max: 30 });
+
+        // FACTOR 2: Multi-Bookmaker Consensus (20% weight)
+        if (allBookmakers && allBookmakers.length >= 2) {
+          const oddsVariance = calculateOddsVariance(allBookmakers, event.home_team, event.away_team);
+          let consensusBonus = 0;
+          
+          if (oddsVariance < 0.1) {
+            consensusBonus = 20; // Strong consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '20 (Strong)', max: 20 });
+          } else if (oddsVariance < 0.2) {
+            consensusBonus = 12; // Moderate consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '12 (Moderate)', max: 20 });
+          } else {
+            consensusBonus = 5; // Weak consensus
+            factors.push({ name: 'Bookmaker Consensus', value: '5 (Weak)', max: 20 });
+          }
+          
+          confidence += consensusBonus;
+        }
+
+        // FACTOR 3: League Position & Form (25% weight)
+        if (standings) {
+          const homeTeam = findTeamInStandings(standings, event.home_team);
+          const awayTeam = findTeamInStandings(standings, event.away_team);
+
+          if (homeTeam && awayTeam) {
+            let positionBonus = 0;
+            const positionDiff = Math.abs(homeTeam.position - awayTeam.position);
+
+            // Large position gap = higher confidence
+            if (positionDiff >= 10) {
+              positionBonus = 15;
+            } else if (positionDiff >= 5) {
+              positionBonus = 10;
+            } else if (positionDiff >= 2) {
+              positionBonus = 5;
+            }
+
+            // Form bonus (recent results)
+            const homeForm = homeTeam.form ? calculateFormScore(homeTeam.form) : 0;
+            const awayForm = awayTeam.form ? calculateFormScore(awayTeam.form) : 0;
+            const formBonus = Math.abs(homeForm - awayForm) * 2; // Up to 10 points
+
+            const totalPositionBonus = Math.min(25, positionBonus + formBonus);
+            confidence += totalPositionBonus;
+            
+            factors.push({ 
+              name: 'Position & Form', 
+              value: `${totalPositionBonus.toFixed(1)} (${homeTeam.position}th vs ${awayTeam.position}th)`, 
+              max: 25 
+            });
+          }
+        }
+
+        // FACTOR 4: Home Advantage (10% weight)
+        let homeAdvantage = 0;
+        if (homeProb > awayProb) {
+          homeAdvantage = 10; // Home team favored
+        } else if (homeProb > drawProb) {
+          homeAdvantage = 5; // Home team competitive
+        }
+        confidence += homeAdvantage;
+        if (homeAdvantage > 0) {
+          factors.push({ name: 'Home Advantage', value: homeAdvantage.toFixed(1), max: 10 });
+        }
+
+        // FACTOR 5: Time to Kick-off (5% weight)
+        const kickoffTime = new Date(event.commence_time);
+        const hoursUntilKickoff = (kickoffTime - new Date()) / (1000 * 60 * 60);
+        
+        let timingBonus = 0;
+        if (hoursUntilKickoff < 6) {
+          timingBonus = 5; // Very close to kickoff - odds are most accurate
+        } else if (hoursUntilKickoff < 24) {
+          timingBonus = 3; // Within 24 hours
+        } else {
+          timingBonus = 0; // Early odds less reliable
+        }
+        confidence += timingBonus;
+        if (timingBonus > 0) {
+          factors.push({ name: 'Timing', value: `${timingBonus} (<${Math.round(hoursUntilKickoff)}h)`, max: 5 });
+        }
+
+        // FACTOR 6: Favorite Strength (10% weight)
+        const favoriteStrength = Math.max(homeProb, awayProb, drawProb);
+        let strengthBonus = 0;
+        
+        if (favoriteStrength > 70) {
+          strengthBonus = 10; // Very strong favorite
+        } else if (favoriteStrength > 60) {
+          strengthBonus = 7;
+        } else if (favoriteStrength > 55) {
+          strengthBonus = 4;
+        }
+        
+        confidence += strengthBonus;
+        if (strengthBonus > 0) {
+          factors.push({ name: 'Favorite Strength', value: strengthBonus.toFixed(1), max: 10 });
+        }
+
+        // Cap at 98% (always leave room for uncertainty)
+        confidence = Math.min(98, Math.max(70, Math.round(confidence)));
+
+        return { confidence, factors };
+      };
+
+      const calculateOddsVariance = (bookmakers, homeTeam, awayTeam) => {
+        const homeOddsList = [];
+        const awayOddsList = [];
+
+        bookmakers.forEach(bookie => {
+          const market = bookie.markets?.find(m => m.key === 'h2h');
+          if (market) {
+            const homeOdds = market.outcomes?.find(o => o.name === homeTeam)?.price;
+            const awayOdds = market.outcomes?.find(o => o.name === awayTeam)?.price;
+            if (homeOdds) homeOddsList.push(homeOdds);
+            if (awayOdds) awayOddsList.push(awayOdds);
+          }
+        });
+
+        if (homeOddsList.length < 2) return 1; // High variance if not enough data
+
+        const homeVariance = calculateVariance(homeOddsList);
+        const awayVariance = calculateVariance(awayOddsList);
+        
+        return (homeVariance + awayVariance) / 2;
+      };
+
+      const calculateVariance = (numbers) => {
+        const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+        const variance = numbers.reduce((sum, num) => sum + Math.pow(num - mean, 2), 0) / numbers.length;
+        return Math.sqrt(variance) / mean; // Coefficient of variation
+      };
+
+      const findTeamInStandings = (standings, teamName) => {
+        const nameLower = teamName.toLowerCase();
+        return standings.find(t => {
+          const sName = t.team.name.toLowerCase();
+          return sName.includes(nameLower) || nameLower.includes(sName) || 
+                 sName.split(' ')[0] === nameLower.split(' ')[0];
+        });
+      };
+
+      const calculateFormScore = (formString) => {
+        // Form string like "W,W,D,L,W" - calculate score
+        if (!formString) return 0;
+        const matches = formString.split(',');
+        let score = 0;
+        matches.forEach((result, idx) => {
+          const weight = matches.length - idx; // Recent matches weighted more
+          if (result === 'W') score += 3 * weight;
+          else if (result === 'D') score += 1 * weight;
+        });
+        return score / 15; // Normalize to 0-5 range
+      };
+
+      const analyzeMatch = (event, leagueName, standings) => {
+        const allBookmakers = event.bookmakers || [];
+        const bookmaker = allBookmakers[0];
         const market = bookmaker?.markets?.find(m => m.key === 'h2h');
         
         if (!market || !market.outcomes || market.outcomes.length < 2) {
@@ -224,27 +504,29 @@
         const awayProb = (1 / awayOdds) * 100;
         const drawProb = (1 / drawOdds) * 100;
 
-        let selection, odds, confidence, predictedScore, strategy;
+        let selection, odds, predictedScore, strategy;
 
         if (homeProb > awayProb && homeProb > drawProb) {
           selection = "Home Win";
           odds = homeOdds;
-          confidence = Math.min(95, Math.max(70, Math.round(homeProb + 5)));
           predictedScore = homeProb > 70 ? "3-0" : homeProb > 60 ? "2-0" : "2-1";
           strategy = homeOdds < 1.5 ? "Heavy Favorite" : homeOdds < 2.0 ? "Clear Favorite" : "Home Advantage";
         } else if (awayProb > homeProb && awayProb > drawProb) {
           selection = "Away Win";
           odds = awayOdds;
-          confidence = Math.min(95, Math.max(70, Math.round(awayProb + 5)));
           predictedScore = awayProb > 70 ? "0-3" : awayProb > 60 ? "0-2" : "1-2";
           strategy = awayOdds < 2.0 ? "Strong Away Form" : "Away Value";
         } else {
           selection = "Draw";
           odds = drawOdds;
-          confidence = Math.min(88, Math.max(70, Math.round(drawProb + 5)));
           predictedScore = "1-1";
           strategy = "Evenly Matched";
         }
+
+        // Calculate enhanced confidence
+        const { confidence, factors } = calculateEnhancedConfidence(
+          event, homeOdds, awayOdds, drawOdds, standings, allBookmakers
+        );
 
         return {
           id: event.id,
@@ -253,19 +535,25 @@
           selection,
           odds,
           confidence,
-          reasoning: `${selection} recommended with ${confidence}% confidence based on current market odds. ${leagueName} fixture with ${strategy.toLowerCase()} characteristics.`,
+          confidenceFactors: factors,
+          reasoning: `${selection} recommended with ${confidence}% confidence based on multi-factor analysis including ${factors.length} indicators.`,
           predictedScore,
           scoreConfidence: Math.max(65, confidence - Math.floor(Math.random() * 8 + 3)),
           strategy,
           bookie: bookmaker?.title || 'Market Average',
+          bookmakerCount: allBookmakers.length,
           commence_time: event.commence_time,
           isToday: new Date(event.commence_time).toDateString() === new Date().toDateString(),
           isLive: new Date(event.commence_time) < new Date(),
-          type: 'Market Analysis',
+          type: 'Enhanced Analysis',
           customerType: 'All Users',
           url: `https://www.google.com/search?q=${encodeURIComponent(event.home_team + ' vs ' + event.away_team + ' odds')}`
         };
       };
+
+      // ============================================================================
+      // MAIN DATA FETCHER - Smart Quota Management
+      // ============================================================================
 
       const fetchLiveOpportunities = async () => {
         setIsLoadingOpportunities(true);
@@ -278,12 +566,33 @@
 
         const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
 
+        // PHASE 1: Fetch standings for active leagues (max 4 to protect quota)
+        console.log('📊 Fetching standings...');
+        const standingsMap = {};
+        let standingsFetched = 0;
+        const priorityLeagues = ['soccer_epl', 'soccer_efl_champ', 'soccer_spain_la_liga', 'soccer_germany_bundesliga'];
+
+        for (const league of allLeagues) {
+          if (standingsFetched >= 4) break;
+          if (priorityLeagues.includes(league.key)) {
+            const standings = await fetchStandings(league.fdId);
+            if (standings) {
+              standingsMap[league.key] = standings;
+              standingsFetched++;
+            }
+          }
+        }
+
+        console.log(`✓ Loaded standings for ${Object.keys(standingsMap).length} leagues`);
+
+        // PHASE 2: Fetch odds for all leagues
+        console.log('💰 Fetching odds...');
         for (const league of allLeagues) {
           try {
-            let events = await fetchDirectOdds(league.key, API_KEYS.primary);
+            let events = await fetchDirectOdds(league.key, API_KEYS.primary, true);
             
             if (events === null) {
-              events = await fetchDirectOdds(league.key, API_KEYS.backup);
+              events = await fetchDirectOdds(league.key, API_KEYS.backup, true);
             }
 
             if (events && events.length > 0) {
@@ -291,7 +600,7 @@
                 const eventTime = new Date(event.commence_time);
                 
                 if (eventTime >= windowStart && eventTime <= windowEnd) {
-                  const analysis = analyzeMatch(event, league.name);
+                  const analysis = analyzeMatch(event, league.name, standingsMap[league.key]);
                   if (analysis) {
                     allRecommendations.push(analysis);
                   }
@@ -309,6 +618,9 @@
         setLastDataFetch(new Date());
         setIsLoadingOpportunities(false);
 
+        console.log(`✅ Total: ${allRecommendations.length} matches analyzed`);
+        console.log(`📊 API Usage - Odds: ${apiUsage.oddsAPI}, Standings: ${apiUsage.footballData}`);
+
         if (allRecommendations.length === 0) {
           setOppsError('No matches found in the next 2 days.');
         }
@@ -318,10 +630,10 @@
         setIsLoadingLaLiga(true);
         
         try {
-          let events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.primary);
+          let events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.primary, true);
           
           if (events === null) {
-            events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.backup);
+            events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.backup, true);
           }
 
           const rmBarcaMatches = [];
@@ -488,6 +800,7 @@
         const [customStake, setCustomStake] = useState('');
         const [isPlacing, setIsPlacing] = useState(false);
         const [isExpanded, setIsExpanded] = useState(false);
+        const [showFactors, setShowFactors] = useState(false);
         const stakeToUse = customStake || userStakeInput;
         const potReturn = (stakeToUse * opp.odds).toFixed(2);
         const profit = (potReturn - stakeToUse).toFixed(2);
@@ -504,13 +817,18 @@
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
                     <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20">
                       {opp.type}
                     </span>
                     {isHighConfidence && (
                       <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                         ⭐ HIGH CONFIDENCE
+                      </span>
+                    )}
+                    {opp.bookmakerCount > 1 && (
+                      <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        {opp.bookmakerCount} Bookies
                       </span>
                     )}
                   </div>
@@ -532,6 +850,45 @@
 
             {isExpanded && (
               <div className="px-6 pb-6 animate-in">
+                {/* Confidence Breakdown */}
+                {opp.confidenceFactors && opp.confidenceFactors.length > 0 && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowFactors(!showFactors)}
+                      className="w-full p-3 bg-purple-500/5 border border-purple-500/20 rounded-xl flex items-center justify-between hover:bg-purple-500/10 transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Target className="text-purple-400" size={14} />
+                        <span className="text-xs font-black text-purple-400 uppercase">
+                          Confidence Breakdown ({opp.confidenceFactors.length} Factors)
+                        </span>
+                      </div>
+                      <span className="text-purple-400 text-xs font-bold">
+                        {showFactors ? '▼' : '▶'}
+                      </span>
+                    </button>
+
+                    {showFactors && (
+                      <div className="mt-3 space-y-2 animate-in">
+                        {opp.confidenceFactors.map((factor, idx) => (
+                          <div key={idx} className="bg-slate-950 rounded-lg p-3 border border-slate-800">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-bold text-slate-300">{factor.name}</span>
+                              <span className="text-xs text-emerald-400 font-black">{factor.value} / {factor.max}</span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2 rounded-full transition-all"
+                                style={{ width: `${(parseFloat(factor.value) / factor.max) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 mb-4 text-xs text-slate-400 bg-slate-800/50 w-fit px-3 py-1.5 rounded-lg border border-slate-700">
                   <Users size={14} className="text-blue-400" />
                   <span className="font-bold">{opp.customerType}</span>
@@ -616,8 +973,6 @@
       };
 
       const stats = calculateStats();
-
-      // Get top 3 non-live bets
       const topNonLiveBets = opportunities.filter(o => !o.isLive).slice(0, 3);
 
       return (
@@ -630,7 +985,7 @@
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
-                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">UK Intelligence v3.0</p>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">Enhanced v3.1 • Multi-Factor</p>
               </div>
             </div>
 
@@ -653,6 +1008,13 @@
             <button className="lg:hidden text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               {isMobileMenuOpen ? <X /> : <Menu />}
             </button>
+
+            {/* API Usage Indicator */}
+            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700">
+              <div className="text-xs text-slate-400">
+                API: {apiUsage.oddsAPI + apiUsage.footballData} calls
+              </div>
+            </div>
           </nav>
 
           {isMobileMenuOpen && (
@@ -677,7 +1039,7 @@
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
                     <p className="text-slate-500 font-medium">
-                      Real-time UK & European Market Analysis
+                      Multi-Factor Analysis • Enhanced Confidence Scoring
                       {lastDataFetch && (
                         <span className="ml-2 text-xs">
                           • Last updated: {lastDataFetch.toLocaleTimeString()}
@@ -694,7 +1056,7 @@
                     {isLoadingOpportunities ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        LOADING...
+                        ANALYZING...
                       </>
                     ) : (
                       <>
@@ -754,7 +1116,6 @@
                   </div>
                 </div>
 
-                {/* Initialize Bankroll */}
                 {currentBankroll === 0 && (
                   <div className="mb-12 p-8 bg-blue-500/5 border-2 border-blue-500/20 rounded-[2rem]">
                     <h3 className="text-lg font-black text-blue-400 mb-4">Set Your Initial Bankroll</h3>
@@ -781,7 +1142,6 @@
                   </div>
                 )}
 
-                {/* Top 3 Best Bets (Non-Live) */}
                 {topNonLiveBets.length > 0 && (
                   <div className="mb-12">
                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
@@ -815,7 +1175,6 @@
                   </div>
                 )}
 
-                {/* Pending Bets */}
                 {placedBets.length > 0 && (
                   <div className="mb-12">
                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
@@ -862,7 +1221,6 @@
                   </div>
                 )}
 
-                {/* All Recommendations */}
                 <div className="mb-12">
                   <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
                     <Zap className="text-amber-400 fill-amber-400" size={16} /> 
@@ -872,7 +1230,8 @@
                   {isLoadingOpportunities ? (
                     <div className="text-center py-20">
                       <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                      <p className="text-slate-400 font-bold">Fetching opportunities...</p>
+                      <p className="text-slate-400 font-bold">Running multi-factor analysis...</p>
+                      <p className="text-slate-600 text-sm mt-2">Analyzing odds, standings, form & consensus</p>
                     </div>
                   ) : opportunities.length === 0 ? (
                     <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
