@@ -229,8 +229,8 @@
 
       // API Configuration
       const API_KEYS = {
-        primary: "0d7491630a8624fe87ea1da0dad2ea3f",
-        backup: "64a74abb6980d161caf1ab8ff856dea9",
+        primary: "0d7491630a8624fe87ea1da0dad2ea3f",  // Get from https://the-odds-api.com
+        backup: "64a74abb6980d161caf1ab8ff856dea9",  // Backup key - auto-fallback if primary fails
         footballData: "ad3bee407db9f5221c7965ef2055f174"
       };
 
@@ -318,36 +318,9 @@
       };
 
       const fetchStandings = async (leagueId) => {
-        if (!leagueId) return null;
-
-        const cached = cache.get(`standings_${leagueId}`);
-        if (cached) {
-          console.log(`✓ Using cached standings for league ${leagueId}`);
-          return cached;
-        }
-
-        const url = `https://api.football-data.org/v4/competitions/${leagueId}/standings`;
-        
-        try {
-          const response = await fetch(url, {
-            headers: { 'X-Auth-Token': API_KEYS.footballData }
-          });
-          
-          setApiUsage(prev => ({ ...prev, footballData: prev.footballData + 1 }));
-
-          if (response.ok) {
-            const data = await response.json();
-            const table = data.standings?.[0]?.table;
-            if (table) {
-              cache.set(`standings_${leagueId}`, table, 360);
-              return table;
-            }
-          }
-          return null;
-        } catch (err) {
-          console.error(`Standings fetch error:`, err);
-          return null;
-        }
+        // Football-Data API has CORS restrictions and doesn't work in browser
+        // Disabling for now - confidence will be based on odds analysis only
+        return null;
       };
 
       // ============================================================================
@@ -365,34 +338,34 @@
 
         let bestProb = Math.max(homeProb, awayProb, drawProb);
         
-        // Base market confidence (50-80 points)
-        let oddsConfidence = 50 + (bestProb - 50) * 0.6;
-        oddsConfidence = Math.min(80, Math.max(50, oddsConfidence));
+        // Base market confidence (60-85 points) - increased weight since no standings
+        let oddsConfidence = 60 + (bestProb - 50) * 0.5;
+        oddsConfidence = Math.min(85, Math.max(60, oddsConfidence));
         
         confidence = oddsConfidence;
         factors.push({ 
           name: 'Market Probability', 
           value: oddsConfidence.toFixed(1), 
-          max: 80,
+          max: 85,
           description: `Implied probability: ${bestProb.toFixed(1)}%`
         });
 
-        // Bookmaker consensus analysis (0-8 points)
+        // Bookmaker consensus analysis (0-10 points) - increased weight
         if (allBookmakers && allBookmakers.length >= 2) {
           const oddsVariance = calculateOddsVariance(allBookmakers, event.home_team, event.away_team);
           let consensusBonus = 0;
           let consensusDesc = '';
           
           if (oddsVariance < 0.05) {
-            consensusBonus = 8;
+            consensusBonus = 10;
             consensusDesc = `${allBookmakers.length} bookmakers strongly agree (variance: ${(oddsVariance * 100).toFixed(1)}%)`;
-            insights.push(`Strong market consensus across ${allBookmakers.length} bookmakers suggests high certainty`);
+            insights.push(`Strong market consensus across ${allBookmakers.length} bookmakers indicates high certainty`);
           } else if (oddsVariance < 0.1) {
-            consensusBonus = 5;
+            consensusBonus = 6;
             consensusDesc = `${allBookmakers.length} bookmakers moderately agree (variance: ${(oddsVariance * 100).toFixed(1)}%)`;
             insights.push(`Moderate agreement across ${allBookmakers.length} bookmakers`);
           } else if (oddsVariance < 0.2) {
-            consensusBonus = 2;
+            consensusBonus = 3;
             consensusDesc = `${allBookmakers.length} bookmakers show some variance (${(oddsVariance * 100).toFixed(1)}%)`;
             insights.push(`Some disagreement among ${allBookmakers.length} bookmakers - market uncertainty`);
           } else {
@@ -405,62 +378,16 @@
           factors.push({ 
             name: 'Bookmaker Consensus', 
             value: consensusBonus.toFixed(1), 
-            max: 8,
+            max: 10,
             description: consensusDesc
           });
-        }
-
-        // League position and form analysis (0-6 points)
-        if (standings) {
-          const homeTeam = findTeamInStandings(standings, event.home_team);
-          const awayTeam = findTeamInStandings(standings, event.away_team);
-
-          if (homeTeam && awayTeam) {
-            let positionBonus = 0;
-            const positionDiff = Math.abs(homeTeam.position - awayTeam.position);
-
-            if (positionDiff >= 10) {
-              positionBonus = 4;
-              insights.push(`Large position gap: ${homeTeam.position}th vs ${awayTeam.position}th (${positionDiff} places)`);
-            } else if (positionDiff >= 5) {
-              positionBonus = 2;
-              insights.push(`Moderate position gap: ${homeTeam.position}th vs ${awayTeam.position}th`);
-            } else if (positionDiff >= 3) {
-              positionBonus = 1;
-            }
-
-            // Detailed form analysis
-            const homeForm = homeTeam.form ? calculateFormScore(homeTeam.form) : 0;
-            const awayForm = awayTeam.form ? calculateFormScore(awayTeam.form) : 0;
-            const formDiff = Math.abs(homeForm - awayForm);
-            const formBonus = Math.min(2, formDiff * 0.4);
-
-            if (homeTeam.form || awayTeam.form) {
-              const homeFormDesc = homeTeam.form ? `${homeTeam.form} (score: ${homeForm.toFixed(1)})` : 'N/A';
-              const awayFormDesc = awayTeam.form ? `${awayTeam.form} (score: ${awayForm.toFixed(1)})` : 'N/A';
-              
-              if (formDiff > 2) {
-                insights.push(`Significant form difference - Home: ${homeFormDesc}, Away: ${awayFormDesc}`);
-              }
-            }
-
-            const totalPositionBonus = Math.min(6, positionBonus + formBonus);
-            confidence += totalPositionBonus;
-            
-            factors.push({ 
-              name: 'League Position & Form', 
-              value: totalPositionBonus.toFixed(1), 
-              max: 6,
-              description: `Positions: ${homeTeam.position}th vs ${awayTeam.position}th | Form: ${homeTeam.form || 'N/A'} vs ${awayTeam.form || 'N/A'}`
-            });
-          }
         }
 
         // Home advantage analysis (0-3 points)
         let homeAdvantage = 0;
         if (homeProb > awayProb && homeProb > drawProb) {
           homeAdvantage = 3;
-          insights.push('Home team favoured - home advantage factor active');
+          insights.push('Home team favoured by market - home advantage factor');
         } else if (homeProb > awayProb) {
           homeAdvantage = 1;
         }
@@ -482,7 +409,7 @@
         let timingDesc = '';
         if (hoursUntilKickoff < 6) {
           timingBonus = 2;
-          timingDesc = `Imminent kickoff (<6 hours) - odds more reliable`;
+          timingDesc = `Imminent kickoff (<6 hours) - odds highly reliable`;
         } else if (hoursUntilKickoff < 24) {
           timingBonus = 1;
           timingDesc = `Kickoff within 24 hours - recent odds`;
@@ -499,21 +426,21 @@
           });
         }
 
-        // Favorite strength analysis (0-6 points)
+        // Favorite strength analysis (0-5 points)
         const favoriteStrength = Math.max(homeProb, awayProb, drawProb);
         let strengthBonus = 0;
         let strengthDesc = '';
         
         if (favoriteStrength > 75) {
-          strengthBonus = 6;
+          strengthBonus = 5;
           strengthDesc = 'Overwhelming favourite (>75% probability)';
           insights.push('Market shows overwhelming confidence in outcome');
         } else if (favoriteStrength > 65) {
-          strengthBonus = 4;
+          strengthBonus = 3;
           strengthDesc = 'Clear favourite (65-75% probability)';
           insights.push('Strong favourite identified by market');
         } else if (favoriteStrength > 55) {
-          strengthBonus = 2;
+          strengthBonus = 1;
           strengthDesc = 'Moderate favourite (55-65% probability)';
         } else {
           strengthDesc = 'Balanced match - no clear favourite';
@@ -525,12 +452,12 @@
           factors.push({ 
             name: 'Favourite Strength', 
             value: strengthBonus.toFixed(1), 
-            max: 6,
+            max: 5,
             description: strengthDesc
           });
         }
 
-        confidence = Math.min(95, Math.max(50, Math.round(confidence)));
+        confidence = Math.min(95, Math.max(60, Math.round(confidence)));
 
         return { confidence, factors, insights };
       };
@@ -831,52 +758,7 @@
       // MAIN DATA FETCHER
       // ============================================================================
 
-      const fetchLiveOpportunities = async () => {
-        setIsLoadingOpportunities(true);
-        setOppsError(null);
-        
-        const allRecommendations = [];
-        const now = new Date();
-        const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
-        const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
-
-        const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
-
-        console.log('📊 Fetching standings...');
-        const standingsMap = {};
-        let standingsFetched = 0;
-        const priorityLeagues = ['soccer_epl', 'soccer_efl_champ', 'soccer_spain_la_liga', 'soccer_germany_bundesliga'];
-
-        for (const league of allLeagues) {
-          if (standingsFetched >= 4) break;
-          if (priorityLeagues.includes(league.key)) {
-            const standings = await fetchStandings(league.fdId);
-            if (standings) {
-              standingsMap[league.key] = standings;
-              standingsFetched++;
-            }
-          }
-        }
-
-        console.log(`✓ Loaded standings for ${Object.keys(standingsMap).length} leagues`);
-
-        console.log('💰 Fetching odds...');
-        for (const league of allLeagues) {
-          try {
-            let events = await fetchDirectOdds(league.key, API_KEYS.primary, true);
-            
-            if (events === null) {
-              events = await fetchDirectOdds(league.key, API_KEYS.backup, true);
-            }
-
-            if (events && events.length > 0) {
-              events.forEach(event => {
-                const eventTime = new Date(event.commence_time);
-                
-                if (eventTime >= windowStart && eventTime <= windowEnd) {
-                  const analysis = analyzeMatch(event, league.name, standingsMap[league.key]);
-                  if (analysis) {
-                    allRecommendations.push(analysis);
+push(analysis);
                   }
                 }
               });
