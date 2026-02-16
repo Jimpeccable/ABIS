@@ -758,7 +758,39 @@
       // MAIN DATA FETCHER
       // ============================================================================
 
-push(analysis);
+      const fetchLiveOpportunities = async () => {
+        setIsLoadingOpportunities(true);
+        setOppsError(null);
+        
+        const allRecommendations = [];
+        const now = new Date();
+        const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
+        const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
+
+        const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
+
+        console.log('📊 Fetching standings...');
+        const standingsMap = {};
+
+        console.log(`✓ Loaded standings for ${Object.keys(standingsMap).length} leagues`);
+
+        console.log('💰 Fetching odds...');
+        for (const league of allLeagues) {
+          try {
+            let events = await fetchDirectOdds(league.key, API_KEYS.primary, true);
+            
+            if (events === null) {
+              events = await fetchDirectOdds(league.key, API_KEYS.backup, true);
+            }
+
+            if (events && events.length > 0) {
+              events.forEach(event => {
+                const eventTime = new Date(event.commence_time);
+                
+                if (eventTime >= windowStart && eventTime <= windowEnd) {
+                  const analysis = analyzeMatch(event, league.name, standingsMap[league.key]);
+                  if (analysis) {
+                    allRecommendations.push(analysis);
                   }
                 }
               });
