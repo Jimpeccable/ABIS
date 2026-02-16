@@ -305,9 +305,9 @@
           }
         }
 
-        // Try all available API keys
-        for (let keyIndex = 0; keyIndex < API_KEYS.odds.length; keyIndex++) {
-          const apiKey = API_KEYS.odds[keyIndex];
+        // Try current key first, then fallback to others if it fails
+        for (let attempt = 0; attempt < API_KEYS.odds.length; attempt++) {
+          const apiKey = API_KEYS.odds[attempt];
           const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=uk&markets=h2h&oddsFormat=decimal`;
           
           try {
@@ -316,23 +316,30 @@
             
             if (response.ok) {
               const data = await response.json();
-              cache.set(`odds_${sport}`, data, 10);
-              console.log(`✓ Fetched ${sport} using odds key #${keyIndex + 1}`);
+              cache.set(`odds_${sport}`, data, 10); // Cache for 10 minutes
+              if (attempt > 0) {
+                console.log(`✓ Fetched ${sport} using backup key #${attempt + 1}`);
+              }
               return data;
             } else if (response.status === 429 || response.status === 401) {
-              console.log(`Key #${keyIndex + 1} failed (${response.status}), trying next key...`);
-              continue; // Try next key
+              // Only try next key if this one is rate limited or unauthorized
+              if (attempt < API_KEYS.odds.length - 1) {
+                console.log(`Key #${attempt + 1} failed (${response.status}), trying next key...`);
+                continue;
+              }
             } else {
-              console.error(`API error for ${sport}: ${response.status}`);
+              // Other errors (404, 500, etc.) - don't retry with different keys
               return [];
             }
           } catch (err) {
             console.error(`Fetch error for ${sport}:`, err);
-            continue; // Try next key
+            if (attempt < API_KEYS.odds.length - 1) {
+              continue;
+            }
           }
         }
         
-        console.error(`All odds API keys exhausted for ${sport}`);
+        // All keys exhausted
         return [];
       };
 
@@ -786,36 +793,16 @@
         const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
         const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
 
-        // Prioritize leagues most likely to have matches
-        const priorityLeagues = [
-          { key: 'soccer_epl', name: 'Premier League', fdId: 2021 },
-          { key: 'soccer_efl_champ', name: 'Championship', fdId: 2016 },
-          { key: 'soccer_spain_la_liga', name: 'La Liga', fdId: 2014 },
-          { key: 'soccer_germany_bundesliga', name: 'Bundesliga', fdId: 2002 },
-          { key: 'soccer_italy_serie_a', name: 'Serie A', fdId: 2019 },
-          { key: 'soccer_france_ligue_one', name: 'Ligue 1', fdId: 2015 }
-        ];
+        const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
 
-        const secondaryLeagues = [
-          { key: 'soccer_portugal_primeira_liga', name: 'Primeira Liga', fdId: 2017 },
-          { key: 'soccer_turkey_super_league', name: 'Süper Lig', fdId: 2070 }
-        ];
-
-        console.log('💰 Fetching odds from priority leagues...');
+        console.log('💰 Fetching odds...');
         
-        let successfulFetches = 0;
-        let apiCallsMade = 0;
-        
-        // Try priority leagues first
-        for (const league of priorityLeagues) {
-          if (apiCallsMade >= 6) break; // Limit API calls to avoid rate limits
-          
+        // Fetch from ALL leagues like the original
+        for (const league of allLeagues) {
           try {
             let events = await fetchDirectOdds(league.key, true);
-            apiCallsMade++;
 
             if (events && events.length > 0) {
-              successfulFetches++;
               events.forEach(event => {
                 const eventTime = new Date(event.commence_time);
                 
@@ -827,42 +814,8 @@
                 }
               });
             }
-            
-            // If we got good data from 3 leagues, that's enough
-            if (successfulFetches >= 3 && allRecommendations.length >= 10) {
-              console.log(`✅ Got ${allRecommendations.length} matches from ${successfulFetches} leagues, stopping early`);
-              break;
-            }
           } catch (err) {
             console.error(`Error fetching ${league.name}:`, err);
-          }
-        }
-        
-        // Only try secondary leagues if we didn't get enough data
-        if (allRecommendations.length < 5 && apiCallsMade < 8) {
-          console.log('Trying secondary leagues...');
-          for (const league of secondaryLeagues) {
-            if (apiCallsMade >= 8) break;
-            
-            try {
-              let events = await fetchDirectOdds(league.key, true);
-              apiCallsMade++;
-
-              if (events && events.length > 0) {
-                events.forEach(event => {
-                  const eventTime = new Date(event.commence_time);
-                  
-                  if (eventTime >= windowStart && eventTime <= windowEnd) {
-                    const analysis = analyzeMatch(event, league.name, null);
-                    if (analysis) {
-                      allRecommendations.push(analysis);
-                    }
-                  }
-                });
-              }
-            } catch (err) {
-              console.error(`Error fetching ${league.name}:`, err);
-            }
           }
         }
 
@@ -872,10 +825,10 @@
         setLastDataFetch(new Date());
         setIsLoadingOpportunities(false);
 
-        console.log(`✅ Total: ${allRecommendations.length} matches analyzed from ${apiCallsMade} API calls`);
+        console.log(`✅ Total: ${allRecommendations.length} matches analyzed`);
 
         if (allRecommendations.length === 0) {
-          setOppsError('No matches found in the next 2 days. Your API keys may be rate limited.');
+          setOppsError('No matches found in the next 2 days.');
         }
       };
 
