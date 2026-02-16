@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ABIS Live - Enhanced v3.2</title>
+  <title>ABIS Live - Enhanced v4.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes fadeIn {
@@ -13,6 +13,13 @@
     .animate-in { animation: fadeIn 0.7s ease-out; }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .bet-selected {
+      animation: pulse 0.5s ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-200">
@@ -23,9 +30,9 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useMemo } = React;
 
-    // Lucide Icons
+    // Lucide Icons (keeping all existing icons plus new ones)
     const Shield = ({className, size=24}) => (
       <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -122,6 +129,18 @@
       </svg>
     );
 
+    const Plus = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    );
+
+    const Check = ({size=24}) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    );
+
     // ============================================================================
     // SMART CACHE MANAGER
     // ============================================================================
@@ -202,6 +221,11 @@
       const [laLigaMatches, setLaLigaMatches] = useState([]);
       const [isLoadingLaLiga, setIsLoadingLaLiga] = useState(false);
       const [apiUsage, setApiUsage] = useState({ oddsAPI: 0, footballData: 0 });
+
+      // NEW: Multi-bet selection state
+      const [selectedBets, setSelectedBets] = useState([]);
+      const [showBetSlip, setShowBetSlip] = useState(false);
+      const [accumulatorStake, setAccumulatorStake] = useState('');
 
       // API Configuration
       const API_KEYS = {
@@ -327,12 +351,13 @@
       };
 
       // ============================================================================
-      // ENHANCED CONFIDENCE CALCULATION
+      // ENHANCED CONFIDENCE CALCULATION WITH DETAILED FACTORS
       // ============================================================================
 
       const calculateEnhancedConfidence = (event, homeOdds, awayOdds, drawOdds, standings, allBookmakers) => {
         let confidence = 0;
         let factors = [];
+        let insights = [];
 
         const homeProb = (1 / homeOdds) * 100;
         const awayProb = (1 / awayOdds) * 100;
@@ -340,33 +365,52 @@
 
         let bestProb = Math.max(homeProb, awayProb, drawProb);
         
+        // Base market confidence (50-80 points)
         let oddsConfidence = 50 + (bestProb - 50) * 0.6;
-        oddsConfidence = Math.min(80, Math.max(60, oddsConfidence));
+        oddsConfidence = Math.min(80, Math.max(50, oddsConfidence));
         
         confidence = oddsConfidence;
-        factors.push({ name: 'Market Odds', value: oddsConfidence.toFixed(1), max: 80 });
+        factors.push({ 
+          name: 'Market Probability', 
+          value: oddsConfidence.toFixed(1), 
+          max: 80,
+          description: `Implied probability: ${bestProb.toFixed(1)}%`
+        });
 
+        // Bookmaker consensus analysis (0-8 points)
         if (allBookmakers && allBookmakers.length >= 2) {
           const oddsVariance = calculateOddsVariance(allBookmakers, event.home_team, event.away_team);
           let consensusBonus = 0;
+          let consensusDesc = '';
           
           if (oddsVariance < 0.05) {
             consensusBonus = 8;
-            factors.push({ name: 'Bookmaker Consensus', value: '8 (Very Strong)', max: 8 });
+            consensusDesc = `${allBookmakers.length} bookmakers strongly agree (variance: ${(oddsVariance * 100).toFixed(1)}%)`;
+            insights.push(`Strong market consensus across ${allBookmakers.length} bookmakers suggests high certainty`);
           } else if (oddsVariance < 0.1) {
             consensusBonus = 5;
-            factors.push({ name: 'Bookmaker Consensus', value: '5 (Strong)', max: 8 });
+            consensusDesc = `${allBookmakers.length} bookmakers moderately agree (variance: ${(oddsVariance * 100).toFixed(1)}%)`;
+            insights.push(`Moderate agreement across ${allBookmakers.length} bookmakers`);
           } else if (oddsVariance < 0.2) {
             consensusBonus = 2;
-            factors.push({ name: 'Bookmaker Consensus', value: '2 (Moderate)', max: 8 });
+            consensusDesc = `${allBookmakers.length} bookmakers show some variance (${(oddsVariance * 100).toFixed(1)}%)`;
+            insights.push(`Some disagreement among ${allBookmakers.length} bookmakers - market uncertainty`);
           } else {
             consensusBonus = 0;
-            factors.push({ name: 'Bookmaker Consensus', value: '0 (Weak)', max: 8 });
+            consensusDesc = `High variance among ${allBookmakers.length} bookmakers (${(oddsVariance * 100).toFixed(1)}%) - uncertain market`;
+            insights.push(`Significant disagreement among bookmakers indicates uncertainty`);
           }
           
           confidence += consensusBonus;
+          factors.push({ 
+            name: 'Bookmaker Consensus', 
+            value: consensusBonus.toFixed(1), 
+            max: 8,
+            description: consensusDesc
+          });
         }
 
+        // League position and form analysis (0-6 points)
         if (standings) {
           const homeTeam = findTeamInStandings(standings, event.home_team);
           const awayTeam = findTeamInStandings(standings, event.away_team);
@@ -377,71 +421,118 @@
 
             if (positionDiff >= 10) {
               positionBonus = 4;
+              insights.push(`Large position gap: ${homeTeam.position}th vs ${awayTeam.position}th (${positionDiff} places)`);
             } else if (positionDiff >= 5) {
               positionBonus = 2;
+              insights.push(`Moderate position gap: ${homeTeam.position}th vs ${awayTeam.position}th`);
             } else if (positionDiff >= 3) {
               positionBonus = 1;
             }
 
+            // Detailed form analysis
             const homeForm = homeTeam.form ? calculateFormScore(homeTeam.form) : 0;
             const awayForm = awayTeam.form ? calculateFormScore(awayTeam.form) : 0;
-            const formBonus = Math.min(2, Math.abs(homeForm - awayForm) * 0.4);
+            const formDiff = Math.abs(homeForm - awayForm);
+            const formBonus = Math.min(2, formDiff * 0.4);
+
+            if (homeTeam.form || awayTeam.form) {
+              const homeFormDesc = homeTeam.form ? `${homeTeam.form} (score: ${homeForm.toFixed(1)})` : 'N/A';
+              const awayFormDesc = awayTeam.form ? `${awayTeam.form} (score: ${awayForm.toFixed(1)})` : 'N/A';
+              
+              if (formDiff > 2) {
+                insights.push(`Significant form difference - Home: ${homeFormDesc}, Away: ${awayFormDesc}`);
+              }
+            }
 
             const totalPositionBonus = Math.min(6, positionBonus + formBonus);
             confidence += totalPositionBonus;
             
             factors.push({ 
-              name: 'Position & Form', 
-              value: `${totalPositionBonus.toFixed(1)} (${homeTeam.position}th vs ${awayTeam.position}th)`, 
-              max: 6 
+              name: 'League Position & Form', 
+              value: totalPositionBonus.toFixed(1), 
+              max: 6,
+              description: `Positions: ${homeTeam.position}th vs ${awayTeam.position}th | Form: ${homeTeam.form || 'N/A'} vs ${awayTeam.form || 'N/A'}`
             });
           }
         }
 
+        // Home advantage analysis (0-3 points)
         let homeAdvantage = 0;
         if (homeProb > awayProb && homeProb > drawProb) {
           homeAdvantage = 3;
+          insights.push('Home team favoured - home advantage factor active');
         } else if (homeProb > awayProb) {
           homeAdvantage = 1;
         }
         confidence += homeAdvantage;
         if (homeAdvantage > 0) {
-          factors.push({ name: 'Home Advantage', value: homeAdvantage.toFixed(1), max: 3 });
+          factors.push({ 
+            name: 'Home Advantage', 
+            value: homeAdvantage.toFixed(1), 
+            max: 3,
+            description: homeAdvantage === 3 ? 'Strong home advantage' : 'Moderate home factor'
+          });
         }
 
+        // Timing analysis (0-2 points)
         const kickoffTime = new Date(event.commence_time);
         const hoursUntilKickoff = (kickoffTime - new Date()) / (1000 * 60 * 60);
         
         let timingBonus = 0;
+        let timingDesc = '';
         if (hoursUntilKickoff < 6) {
           timingBonus = 2;
+          timingDesc = `Imminent kickoff (<6 hours) - odds more reliable`;
         } else if (hoursUntilKickoff < 24) {
           timingBonus = 1;
+          timingDesc = `Kickoff within 24 hours - recent odds`;
+        } else {
+          timingDesc = `${Math.round(hoursUntilKickoff)} hours until kickoff`;
         }
         confidence += timingBonus;
         if (timingBonus > 0) {
-          factors.push({ name: 'Timing', value: `${timingBonus} (<${Math.round(hoursUntilKickoff)}h)`, max: 2 });
+          factors.push({ 
+            name: 'Timing Factor', 
+            value: timingBonus.toFixed(1), 
+            max: 2,
+            description: timingDesc
+          });
         }
 
+        // Favorite strength analysis (0-6 points)
         const favoriteStrength = Math.max(homeProb, awayProb, drawProb);
         let strengthBonus = 0;
+        let strengthDesc = '';
         
         if (favoriteStrength > 75) {
           strengthBonus = 6;
+          strengthDesc = 'Overwhelming favourite (>75% probability)';
+          insights.push('Market shows overwhelming confidence in outcome');
         } else if (favoriteStrength > 65) {
           strengthBonus = 4;
+          strengthDesc = 'Clear favourite (65-75% probability)';
+          insights.push('Strong favourite identified by market');
         } else if (favoriteStrength > 55) {
           strengthBonus = 2;
+          strengthDesc = 'Moderate favourite (55-65% probability)';
+        } else {
+          strengthDesc = 'Balanced match - no clear favourite';
+          insights.push('Evenly matched - higher risk');
         }
         
         confidence += strengthBonus;
         if (strengthBonus > 0) {
-          factors.push({ name: 'Favorite Strength', value: strengthBonus.toFixed(1), max: 6 });
+          factors.push({ 
+            name: 'Favourite Strength', 
+            value: strengthBonus.toFixed(1), 
+            max: 6,
+            description: strengthDesc
+          });
         }
 
-        confidence = Math.min(95, Math.max(60, Math.round(confidence)));
+        confidence = Math.min(95, Math.max(50, Math.round(confidence)));
 
-        return { confidence, factors };
+        return { confidence, factors, insights };
       };
 
       const calculateOddsVariance = (bookmakers, homeTeam, awayTeam) => {
@@ -518,26 +609,46 @@
 
         let selection, odds, predictedScore, strategy;
 
+        // Determine selection with more detailed reasoning
         if (homeProb > awayProb && homeProb > drawProb) {
           selection = "Home Win";
           odds = homeOdds;
           predictedScore = homeProb > 70 ? "3-0" : homeProb > 60 ? "2-0" : "2-1";
-          strategy = homeOdds < 1.5 ? "Heavy Favorite" : homeOdds < 2.0 ? "Clear Favorite" : "Home Advantage";
+          
+          if (homeOdds < 1.3) {
+            strategy = "Overwhelming Home Favourite - High Stakes Match";
+          } else if (homeOdds < 1.5) {
+            strategy = "Heavy Home Favourite - Strong Home Position";
+          } else if (homeOdds < 2.0) {
+            strategy = "Clear Home Favourite - Home Advantage";
+          } else {
+            strategy = "Home Win Likely - Competitive Match";
+          }
         } else if (awayProb > homeProb && awayProb > drawProb) {
           selection = "Away Win";
           odds = awayOdds;
           predictedScore = awayProb > 70 ? "0-3" : awayProb > 60 ? "0-2" : "1-2";
-          strategy = awayOdds < 2.0 ? "Strong Away Form" : "Away Value";
+          
+          if (awayOdds < 1.5) {
+            strategy = "Strong Away Form - Dominant Visitor";
+          } else if (awayOdds < 2.0) {
+            strategy = "Away Favourite - Strong Away Record";
+          } else {
+            strategy = "Away Win Possible - Competitive Away Side";
+          }
         } else {
           selection = "Draw";
           odds = drawOdds;
           predictedScore = "1-1";
-          strategy = "Evenly Matched";
+          strategy = "Evenly Matched Teams - Draw Likely";
         }
 
-        const { confidence, factors } = calculateEnhancedConfidence(
+        const { confidence, factors, insights } = calculateEnhancedConfidence(
           event, homeOdds, awayOdds, drawOdds, standings, allBookmakers
         );
+
+        // Generate detailed reasoning
+        const reasoning = `${selection} recommended with ${confidence}% confidence based on analysis of ${factors.length} key factors across ${allBookmakers.length} bookmakers. ${insights.join('. ')}.`;
 
         return {
           id: event.id,
@@ -547,7 +658,8 @@
           odds,
           confidence,
           confidenceFactors: factors,
-          reasoning: `${selection} recommended with ${confidence}% confidence based on multi-factor analysis including ${factors.length} indicators.`,
+          reasoning,
+          insights,
           predictedScore,
           scoreConfidence: Math.max(65, confidence - Math.floor(Math.random() * 8 + 3)),
           strategy,
@@ -559,8 +671,160 @@
           drawOdds,
           type: 'Enhanced Analysis',
           customerType: 'All Users',
-          url: `https://www.google.com/search?q=${encodeURIComponent(event.home_team + ' vs ' + event.away_team + ' odds')}`
+          url: `https://www.google.com/search?q=${encodeURIComponent(event.home_team + ' vs ' + event.away_team + ' odds')}`,
+          homeTeam: event.home_team,
+          awayTeam: event.away_team
         };
+      };
+
+      // ============================================================================
+      // ACCUMULATOR SUGGESTIONS
+      // ============================================================================
+
+      const generateAccumulatorSuggestions = (opportunities) => {
+        if (opportunities.length < 2) return [];
+
+        const suggestions = [];
+        
+        // Filter high-confidence bets (80%+)
+        const highConfidence = opportunities.filter(o => o.confidence >= 80);
+        
+        if (highConfidence.length >= 2) {
+          // Suggestion 1: Top 3 highest confidence
+          const top3 = [...highConfidence].sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+          if (top3.length >= 2) {
+            const combinedOdds = top3.reduce((acc, bet) => acc * bet.odds, 1);
+            suggestions.push({
+              name: 'Safe Accumulator',
+              bets: top3,
+              totalOdds: combinedOdds,
+              avgConfidence: top3.reduce((sum, b) => sum + b.confidence, 0) / top3.length,
+              description: `${top3.length} highest confidence selections`,
+              risk: 'Low'
+            });
+          }
+        }
+
+        // Suggestion 2: Same league accumulator
+        const leagueGroups = {};
+        opportunities.forEach(opp => {
+          if (!leagueGroups[opp.league]) leagueGroups[opp.league] = [];
+          leagueGroups[opp.league].push(opp);
+        });
+
+        Object.entries(leagueGroups).forEach(([league, bets]) => {
+          if (bets.length >= 2) {
+            const topBets = bets.filter(b => b.confidence >= 75).slice(0, 3);
+            if (topBets.length >= 2) {
+              const combinedOdds = topBets.reduce((acc, bet) => acc * bet.odds, 1);
+              suggestions.push({
+                name: `${league} Accumulator`,
+                bets: topBets,
+                totalOdds: combinedOdds,
+                avgConfidence: topBets.reduce((sum, b) => sum + b.confidence, 0) / topBets.length,
+                description: `${topBets.length} picks from ${league}`,
+                risk: 'Medium'
+              });
+            }
+          }
+        });
+
+        // Suggestion 3: Value accumulator (higher odds)
+        const valueOpps = opportunities.filter(o => o.odds >= 1.5 && o.odds <= 2.5 && o.confidence >= 70);
+        if (valueOpps.length >= 2) {
+          const valuePicks = [...valueOpps].sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+          const combinedOdds = valuePicks.reduce((acc, bet) => acc * bet.odds, 1);
+          suggestions.push({
+            name: 'Value Accumulator',
+            bets: valuePicks,
+            totalOdds: combinedOdds,
+            avgConfidence: valuePicks.reduce((sum, b) => sum + b.confidence, 0) / valuePicks.length,
+            description: `${valuePicks.length} balanced value picks`,
+            risk: 'Medium'
+          });
+        }
+
+        return suggestions.slice(0, 3); // Return max 3 suggestions
+      };
+
+      // ============================================================================
+      // MULTI-BET FUNCTIONS
+      // ============================================================================
+
+      const toggleBetSelection = (opp) => {
+        setSelectedBets(prev => {
+          const isSelected = prev.some(b => b.id === opp.id);
+          if (isSelected) {
+            return prev.filter(b => b.id !== opp.id);
+          } else {
+            return [...prev, opp];
+          }
+        });
+        
+        if (!showBetSlip) {
+          setShowBetSlip(true);
+        }
+      };
+
+      const clearBetSlip = () => {
+        setSelectedBets([]);
+        setAccumulatorStake('');
+      };
+
+      const calculateCombinedOdds = () => {
+        if (selectedBets.length === 0) return 0;
+        return selectedBets.reduce((acc, bet) => acc * bet.odds, 1);
+      };
+
+      const getBetTypeName = () => {
+        if (selectedBets.length === 1) return 'Single';
+        if (selectedBets.length === 2) return 'Double';
+        if (selectedBets.length === 3) return 'Treble';
+        return `${selectedBets.length}-Fold Accumulator`;
+      };
+
+      const handlePlaceMultiBet = () => {
+        if (selectedBets.length === 0) return;
+        
+        const stake = parseFloat(accumulatorStake) || parseFloat(userStakeInput);
+        
+        if (currentBankroll < stake) {
+          alert('Insufficient bankroll for this bet!');
+          return;
+        }
+
+        const combinedOdds = calculateCombinedOdds();
+        const betTypeName = getBetTypeName();
+        
+        const newBet = {
+          id: Date.now(),
+          event: selectedBets.map(b => b.event).join(' + '),
+          league: 'Multi-Bet',
+          selection: selectedBets.map(b => b.selection).join(', '),
+          type: betTypeName,
+          betType: selectedBets.length === 1 ? 'single' : selectedBets.length === 2 ? 'double' : selectedBets.length === 3 ? 'treble' : 'accumulator',
+          bookie: 'Multiple',
+          odds: combinedOdds,
+          stake: stake,
+          potentialReturn: (stake * combinedOdds).toFixed(2),
+          profit: ((stake * combinedOdds) - stake).toFixed(2),
+          confidence: (selectedBets.reduce((sum, b) => sum + b.confidence, 0) / selectedBets.length).toFixed(1),
+          placedAt: new Date().toISOString(),
+          status: 'pending',
+          multiBetLegs: selectedBets.map(b => ({
+            event: b.event,
+            selection: b.selection,
+            odds: b.odds,
+            league: b.league
+          }))
+        };
+        
+        setPlacedBets([...placedBets, newBet]);
+        setCurrentBankroll(currentBankroll - stake);
+        
+        // Clear bet slip
+        clearBetSlip();
+        setShowBetSlip(false);
       };
 
       // ============================================================================
@@ -809,6 +1073,9 @@
         return { totalBets, wonBets, totalStaked, totalReturns, netProfit, winRate };
       };
 
+      // Memoize accumulator suggestions
+      const accumulatorSuggestions = useMemo(() => generateAccumulatorSuggestions(opportunities), [opportunities]);
+
       const OpportunityCard = ({ opp }) => {
         const [customStake, setCustomStake] = useState('');
         const [isPlacing, setIsPlacing] = useState(false);
@@ -820,16 +1087,16 @@
         const profit = (potReturn - stakeToUse).toFixed(2);
         const alreadyPlaced = placedBets.some(b => b.oppId === opp.id);
         const isHighConfidence = opp.confidence >= 90;
+        const isSelected = selectedBets.some(b => b.id === opp.id);
 
         return (
-          <div className={`bg-slate-900 border-2 rounded-2xl shadow-2xl hover:shadow-blue-500/20 transition-all ${
-            isHighConfidence ? 'border-emerald-500/60 shadow-emerald-500/20' : 'border-slate-700 hover:border-blue-500/50'
+          <div className={`bg-slate-900 border-2 rounded-2xl shadow-2xl transition-all ${
+            isSelected ? 'border-purple-500 shadow-purple-500/30 bet-selected' :
+            isHighConfidence ? 'border-emerald-500/60 shadow-emerald-500/20 hover:shadow-emerald-500/30' : 
+            'border-slate-700 hover:border-blue-500/50 hover:shadow-blue-500/20'
           }`}>
-            <div 
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="p-6 cursor-pointer"
-            >
-              <div className="flex justify-between items-start">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
                     <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
@@ -848,157 +1115,188 @@
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">{opp.event}</h3>
                   <p className="text-xs text-blue-400 font-bold mb-2">{opp.league}</p>
-                  <p className="text-sm text-slate-300 font-bold">{opp.selection} @ {opp.odds}</p>
+                  <p className="text-sm text-slate-300 font-bold">{opp.selection} @ {opp.odds.toFixed(2)}</p>
                 </div>
                 <div className="text-right ml-4">
                   <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-widest mb-1">Confidence</span>
                   <span className={`text-3xl font-black ${isHighConfidence ? 'text-emerald-400' : 'text-white'}`}>
                     {opp.confidence}%
                   </span>
-                  <div className="mt-2 text-slate-500">
-                    {isExpanded ? '▼' : '▶'}
-                  </div>
+                  <button
+                    onClick={() => toggleBetSelection(opp)}
+                    className={`mt-3 px-4 py-2 rounded-xl text-xs font-black transition-all border-2 flex items-center gap-2 ${
+                      isSelected 
+                        ? 'bg-purple-600 text-white border-purple-500' 
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-purple-600/20 hover:border-purple-500/50'
+                    }`}
+                  >
+                    {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                    {isSelected ? 'Selected' : 'Add to Slip'}
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {isExpanded && (
-              <div className="px-6 pb-6 border-t border-slate-800 pt-6 animate-in">
-                {opp.confidenceFactors && opp.confidenceFactors.length > 0 && (
-                  <div className="mb-4">
-                    <button
-                      onClick={() => setShowFactors(!showFactors)}
-                      className="w-full p-3 bg-purple-500/10 border-2 border-purple-500/30 rounded-xl flex items-center justify-between hover:bg-purple-500/20 transition-all"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Target className="text-purple-400" size={16} />
-                        <span className="text-xs font-black text-purple-400 uppercase">
-                          Confidence Breakdown ({opp.confidenceFactors.length} Factors)
-                        </span>
-                      </div>
-                      <span className="text-purple-400 text-xs font-bold">
-                        {showFactors ? '▼' : '▶'}
-                      </span>
-                    </button>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full text-left text-slate-500 text-xs font-bold flex items-center justify-between"
+              >
+                <span>Click to {isExpanded ? 'collapse' : 'expand'} details</span>
+                <span>{isExpanded ? '▼' : '▶'}</span>
+              </button>
 
-                    {showFactors && (
-                      <div className="mt-3 space-y-2 animate-in">
-                        {opp.confidenceFactors.map((factor, idx) => (
-                          <div key={idx} className="bg-slate-950 rounded-lg p-3 border-2 border-slate-700">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-bold text-slate-300">{factor.name}</span>
-                              <span className="text-xs text-emerald-400 font-black">{factor.value} / {factor.max}</span>
-                            </div>
-                            <div className="w-full bg-slate-800 rounded-full h-2.5">
-                              <div 
-                                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2.5 rounded-full transition-all"
-                                style={{ width: `${(parseFloat(factor.value) / factor.max) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-3 mb-4">
-                  <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-700">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Bookmaker</p>
-                      <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1">
-                        Visit Site <ArrowUpRight size={10}/>
-                      </a>
+              {isExpanded && (
+                <div className="pt-6 border-t border-slate-800 mt-4 animate-in">
+                  {opp.insights && opp.insights.length > 0 && (
+                    <div className="mb-4 p-4 bg-blue-500/10 rounded-xl border-2 border-blue-500/20">
+                      <p className="text-[10px] text-blue-400 font-black uppercase mb-2 flex items-center gap-2">
+                        <Target size={12} />
+                        KEY INSIGHTS
+                      </p>
+                      {opp.insights.map((insight, idx) => (
+                        <p key={idx} className="text-xs text-slate-300 mb-1 last:mb-0">• {insight}</p>
+                      ))}
                     </div>
-                    <p className="text-sm font-bold text-white">{opp.bookie} @ <span className="text-blue-400">{opp.odds}</span></p>
-                  </div>
-                </div>
+                  )}
 
-                <div className="mb-4 space-y-3">
-                  <div className="p-4 bg-blue-500/10 rounded-xl border-2 border-blue-500/20">
-                    <p className="text-[10px] text-blue-400 font-black uppercase mb-2">Strategy</p>
-                    <p className="text-xs text-slate-300 italic leading-relaxed font-medium">"{opp.strategy}"</p>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                    <span className="text-slate-300 font-bold">Analysis:</span> {opp.reasoning}
-                  </p>
-                </div>
-
-                {!alreadyPlaced && (
-                  <>
-                    <div className="mb-4 p-4 bg-slate-950 rounded-xl border-2 border-slate-700">
-                      <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Bet Type</p>
-                      <div className="flex gap-2">
-                        {['single', 'accumulator', 'treble'].map(type => (
-                          <button
-                            key={type}
-                            onClick={() => setSelectedBetType(type)}
-                            className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
-                              selectedBetType === type 
-                                ? 'bg-blue-600 text-white border-blue-500' 
-                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'
-                            }`}
-                          >
-                            {type === 'single' && '1x'}
-                            {type === 'accumulator' && <Layers size={14} className="mx-auto" />}
-                            {type === 'treble' && '3x'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mb-4 p-4 bg-slate-950 rounded-xl border-2 border-slate-700">
-                      <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Custom Stake (Optional)</p>
-                      <div className="flex items-center">
-                        <span className="text-lg font-black text-slate-500 mr-2">£</span>
-                        <input 
-                          type="number"
-                          placeholder={userStakeInput}
-                          className="bg-transparent text-lg font-bold text-white w-full focus:outline-none"
-                          value={customStake}
-                          onChange={(e) => setCustomStake(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="mt-auto pt-4 border-t-2 border-slate-800">
-                  {alreadyPlaced ? (
-                    <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/20 rounded-xl border-2 border-emerald-500/40">
-                      <CheckSquare size={20} className="text-emerald-400" />
-                      <span className="text-sm font-bold text-emerald-400">Bet Placed - Track in Pending Bets</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase mb-1">Est. Return</p>
-                          <p className="text-2xl font-black text-emerald-400">£{potReturn}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase mb-1">Net Profit</p>
-                          <p className="text-xl font-bold text-white">£{profit}</p>
-                        </div>
-                      </div>
+                  {opp.confidenceFactors && opp.confidenceFactors.length > 0 && (
+                    <div className="mb-4">
                       <button
-                        onClick={() => {
-                          setIsPlacing(true);
-                          setTimeout(() => {
-                            handlePlaceBet(opp, customStake, selectedBetType);
-                            setIsPlacing(false);
-                          }, 500);
-                        }}
-                        disabled={isPlacing || currentBankroll < stakeToUse}
-                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg"
+                        onClick={() => setShowFactors(!showFactors)}
+                        className="w-full p-3 bg-purple-500/10 border-2 border-purple-500/30 rounded-xl flex items-center justify-between hover:bg-purple-500/20 transition-all"
                       >
-                        {isPlacing ? 'PLACING...' : currentBankroll < stakeToUse ? 'INSUFFICIENT BANKROLL' : 'PLACE BET'}
+                        <div className="flex items-center gap-2">
+                          <Target className="text-purple-400" size={16} />
+                          <span className="text-xs font-black text-purple-400 uppercase">
+                            Detailed Confidence Breakdown ({opp.confidenceFactors.length} Factors)
+                          </span>
+                        </div>
+                        <span className="text-purple-400 text-xs font-bold">
+                          {showFactors ? '▼' : '▶'}
+                        </span>
                       </button>
+
+                      {showFactors && (
+                        <div className="mt-3 space-y-2 animate-in">
+                          {opp.confidenceFactors.map((factor, idx) => (
+                            <div key={idx} className="bg-slate-950 rounded-lg p-3 border-2 border-slate-700">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs font-bold text-slate-300">{factor.name}</span>
+                                <span className="text-xs text-emerald-400 font-black">{factor.value} / {factor.max}</span>
+                              </div>
+                              {factor.description && (
+                                <p className="text-[10px] text-slate-500 mb-2">{factor.description}</p>
+                              )}
+                              <div className="w-full bg-slate-800 rounded-full h-2.5">
+                                <div 
+                                  className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2.5 rounded-full transition-all"
+                                  style={{ width: `${(parseFloat(factor.value) / factor.max) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3 mb-4">
+                    <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-700">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Bookmaker</p>
+                        <a href={opp.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1">
+                          Visit Site <ArrowUpRight size={10}/>
+                        </a>
+                      </div>
+                      <p className="text-sm font-bold text-white">{opp.bookie} @ <span className="text-blue-400">{opp.odds.toFixed(2)}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 space-y-3">
+                    <div className="p-4 bg-blue-500/10 rounded-xl border-2 border-blue-500/20">
+                      <p className="text-[10px] text-blue-400 font-black uppercase mb-2">Strategy</p>
+                      <p className="text-xs text-slate-300 italic leading-relaxed font-medium">"{opp.strategy}"</p>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                      <span className="text-slate-300 font-bold">Analysis:</span> {opp.reasoning}
+                    </p>
+                  </div>
+
+                  {!alreadyPlaced && (
+                    <>
+                      <div className="mb-4 p-4 bg-slate-950 rounded-xl border-2 border-slate-700">
+                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Bet Type</p>
+                        <div className="flex gap-2">
+                          {['single', 'accumulator', 'treble'].map(type => (
+                            <button
+                              key={type}
+                              onClick={() => setSelectedBetType(type)}
+                              className={`flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                                selectedBetType === type 
+                                  ? 'bg-blue-600 text-white border-blue-500' 
+                                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'
+                              }`}
+                            >
+                              {type === 'single' && '1x'}
+                              {type === 'accumulator' && <Layers size={14} className="mx-auto" />}
+                              {type === 'treble' && '3x'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mb-4 p-4 bg-slate-950 rounded-xl border-2 border-slate-700">
+                        <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Custom Stake (Optional)</p>
+                        <div className="flex items-center">
+                          <span className="text-lg font-black text-slate-500 mr-2">£</span>
+                          <input 
+                            type="number"
+                            placeholder={userStakeInput}
+                            className="bg-transparent text-lg font-bold text-white w-full focus:outline-none"
+                            value={customStake}
+                            onChange={(e) => setCustomStake(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </>
                   )}
+
+                  <div className="mt-auto pt-4 border-t-2 border-slate-800">
+                    {alreadyPlaced ? (
+                      <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/20 rounded-xl border-2 border-emerald-500/40">
+                        <CheckSquare size={20} className="text-emerald-400" />
+                        <span className="text-sm font-bold text-emerald-400">Bet Placed - Track in Pending Bets</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-4">
+                          <div>
+                            <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase mb-1">Est. Return</p>
+                            <p className="text-2xl font-black text-emerald-400">£{potReturn}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase mb-1">Net Profit</p>
+                            <p className="text-xl font-bold text-white">£{profit}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setIsPlacing(true);
+                            setTimeout(() => {
+                              handlePlaceBet(opp, customStake, selectedBetType);
+                              setIsPlacing(false);
+                            }, 500);
+                          }}
+                          disabled={isPlacing || currentBankroll < stakeToUse}
+                          className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg"
+                        >
+                          {isPlacing ? 'PLACING...' : currentBankroll < stakeToUse ? 'INSUFFICIENT BANKROLL' : 'PLACE SINGLE BET'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         );
       };
@@ -1016,7 +1314,7 @@
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">ABIS Live</h1>
-                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">Enhanced v3.2 • Pro Features</p>
+                <p className="text-[9px] text-blue-400 font-black tracking-[0.2em] uppercase">Enhanced v4.0 • Multi-Bet System</p>
               </div>
             </div>
 
@@ -1040,12 +1338,121 @@
               {isMobileMenuOpen ? <X /> : <Menu />}
             </button>
 
-            <div className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700">
-              <div className="text-xs text-slate-400">
-                API: {apiUsage.oddsAPI + apiUsage.footballData} calls
+            <div className="hidden lg:flex items-center gap-4">
+              {selectedBets.length > 0 && (
+                <button
+                  onClick={() => setShowBetSlip(!showBetSlip)}
+                  className="relative px-4 py-2 rounded-full bg-purple-600 text-white font-bold text-sm hover:bg-purple-500 transition-all"
+                >
+                  Bet Slip ({selectedBets.length})
+                  {selectedBets.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
+                      {selectedBets.length}
+                    </span>
+                  )}
+                </button>
+              )}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700">
+                <div className="text-xs text-slate-400">
+                  API: {apiUsage.oddsAPI + apiUsage.footballData} calls
+                </div>
               </div>
             </div>
           </nav>
+
+          {/* BET SLIP SIDEBAR */}
+          {showBetSlip && selectedBets.length > 0 && (
+            <div className="fixed top-20 right-0 w-96 h-[calc(100vh-5rem)] bg-slate-900 border-l-2 border-purple-500 z-40 overflow-y-auto shadow-2xl">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-black text-white">Bet Slip</h3>
+                  <button
+                    onClick={() => setShowBetSlip(false)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X />
+                  </button>
+                </div>
+
+                <div className="mb-6 p-4 bg-purple-500/10 border-2 border-purple-500/30 rounded-xl">
+                  <p className="text-xs text-purple-400 font-black uppercase mb-2">{getBetTypeName()}</p>
+                  <p className="text-2xl font-black text-white">{selectedBets.length} Selection{selectedBets.length > 1 ? 's' : ''}</p>
+                  <p className="text-xs text-slate-400 mt-1">Combined Odds: {calculateCombinedOdds().toFixed(2)}</p>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {selectedBets.map((bet, idx) => (
+                    <div key={bet.id} className="bg-slate-950 border-2 border-slate-700 rounded-xl p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <p className="text-xs text-blue-400 font-bold mb-1">{bet.league}</p>
+                          <p className="text-sm font-bold text-white mb-1">{bet.event}</p>
+                          <p className="text-xs text-slate-400">{bet.selection}</p>
+                        </div>
+                        <button
+                          onClick={() => toggleBetSelection(bet)}
+                          className="text-red-400 hover:text-red-300 ml-2"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-800">
+                        <span className="text-xs text-slate-500">Odds</span>
+                        <span className="text-sm font-bold text-emerald-400">{bet.odds.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mb-6 p-4 bg-slate-950 rounded-xl border-2 border-slate-700">
+                  <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Total Stake</p>
+                  <div className="flex items-center">
+                    <span className="text-lg font-black text-slate-500 mr-2">£</span>
+                    <input 
+                      type="number"
+                      placeholder={userStakeInput}
+                      className="bg-transparent text-lg font-bold text-white w-full focus:outline-none"
+                      value={accumulatorStake}
+                      onChange={(e) => setAccumulatorStake(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-950 rounded-xl border-2 border-emerald-500/30 mb-4">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xs text-slate-400">Total Stake</span>
+                    <span className="text-sm font-bold text-white">£{(parseFloat(accumulatorStake) || userStakeInput).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xs text-slate-400">Combined Odds</span>
+                    <span className="text-sm font-bold text-white">{calculateCombinedOdds().toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-slate-800">
+                    <span className="text-xs font-bold text-emerald-400">Potential Return</span>
+                    <span className="text-lg font-black text-emerald-400">
+                      £{((parseFloat(accumulatorStake) || userStakeInput) * calculateCombinedOdds()).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={handlePlaceMultiBet}
+                    disabled={currentBankroll < (parseFloat(accumulatorStake) || userStakeInput)}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 text-white py-4 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg"
+                  >
+                    PLACE {getBetTypeName().toUpperCase()}
+                  </button>
+                  <button
+                    onClick={clearBetSlip}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-all"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {isMobileMenuOpen && (
             <div className="fixed inset-0 top-20 bg-slate-950 z-40 p-6 flex flex-col gap-4 lg:hidden">
@@ -1069,7 +1476,7 @@
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight">Active Signals</h2>
                     <p className="text-slate-500 font-medium">
-                      Multi-Factor Analysis • Enhanced Confidence Scoring
+                      Enhanced Multi-Factor Analysis • Detailed Insights
                       {lastDataFetch && (
                         <span className="ml-2 text-xs">
                           • Last updated: {lastDataFetch.toLocaleTimeString()}
@@ -1194,6 +1601,60 @@
                   </div>
                 )}
 
+                {/* ACCUMULATOR SUGGESTIONS */}
+                {accumulatorSuggestions.length > 0 && (
+                  <div className="mb-12">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
+                      <Layers size={16} className="text-purple-400" /> SUGGESTED ACCUMULATORS
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {accumulatorSuggestions.map((suggestion, idx) => (
+                        <div key={idx} className="bg-gradient-to-br from-slate-900 to-purple-900/20 border-2 border-purple-500/50 rounded-[2rem] p-6 shadow-2xl shadow-purple-500/10">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="text-lg font-black text-white mb-1">{suggestion.name}</h4>
+                              <p className="text-xs text-slate-400">{suggestion.description}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
+                              suggestion.risk === 'Low' ? 'bg-emerald-500/20 text-emerald-400' :
+                              'bg-amber-500/20 text-amber-400'
+                            }`}>
+                              {suggestion.risk} Risk
+                            </span>
+                          </div>
+                          <div className="space-y-2 mb-4">
+                            {suggestion.bets.map((bet, bidx) => (
+                              <div key={bidx} className="text-xs text-slate-300 flex justify-between">
+                                <span>{bet.event}</span>
+                                <span className="text-blue-400">{bet.odds.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t border-slate-700 pt-4 mb-4">
+                            <div className="flex justify-between mb-2">
+                              <span className="text-xs text-slate-500">Combined Odds</span>
+                              <span className="text-lg font-black text-emerald-400">{suggestion.totalOdds.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-xs text-slate-500">Avg Confidence</span>
+                              <span className="text-sm font-bold text-white">{suggestion.avgConfidence.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedBets(suggestion.bets);
+                              setShowBetSlip(true);
+                            }}
+                            className="w-full bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl text-xs font-black transition-all active:scale-95 shadow-lg"
+                          >
+                            ADD TO BET SLIP
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {topNonLiveBets.length > 0 && (
                   <div className="mb-12">
                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-6">
@@ -1207,19 +1668,31 @@
                           </div>
                           <p className="text-[10px] text-emerald-400 font-black uppercase mb-2 tracking-[0.2em]">{opp.league}</p>
                           <h4 className="text-xl font-black text-white mb-1 truncate">{opp.event}</h4>
-                          <p className="text-sm text-slate-400 mb-6">{opp.selection} @ <span className="text-emerald-400 font-bold">{opp.odds}</span></p>
+                          <p className="text-sm text-slate-400 mb-6">{opp.selection} @ <span className="text-emerald-400 font-bold">{opp.odds.toFixed(2)}</span></p>
                           <div className="flex justify-between items-end">
                             <div>
                               <p className="text-[9px] text-slate-500 uppercase font-black mb-1 tracking-widest">Confidence</p>
                               <p className="text-3xl font-black text-white">{opp.confidence}%</p>
                             </div>
-                            <button
-                              onClick={() => handlePlaceBet(opp, null, 'single')}
-                              disabled={currentBankroll < userStakeInput}
-                              className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
-                            >
-                              PLACE BET
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => toggleBetSelection(opp)}
+                                className={`p-3 rounded-xl transition-all ${
+                                  selectedBets.some(b => b.id === opp.id)
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-slate-800 text-slate-400 hover:bg-purple-600/20'
+                                }`}
+                              >
+                                {selectedBets.some(b => b.id === opp.id) ? <Check size={16} /> : <Plus size={16} />}
+                              </button>
+                              <button
+                                onClick={() => handlePlaceBet(opp, null, 'single')}
+                                disabled={currentBankroll < userStakeInput}
+                                className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 shadow-lg shadow-emerald-600/20"
+                              >
+                                PLACE BET
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1242,13 +1715,27 @@
                                   <h4 className="text-lg font-bold text-white">{bet.event}</h4>
                                   <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
                                     bet.betType === 'single' ? 'bg-blue-500/20 text-blue-400' :
-                                    bet.betType === 'accumulator' ? 'bg-purple-500/20 text-purple-400' :
-                                    'bg-amber-500/20 text-amber-400'
+                                    bet.betType === 'double' ? 'bg-purple-500/20 text-purple-400' :
+                                    bet.betType === 'treble' ? 'bg-amber-500/20 text-amber-400' :
+                                    'bg-red-500/20 text-red-400'
                                   }`}>
                                     {bet.betType}
                                   </span>
                                 </div>
                                 <p className="text-xs text-blue-400 font-bold mb-2">{bet.league} • {bet.selection}</p>
+                                
+                                {/* Show multi-bet legs if applicable */}
+                                {bet.multiBetLegs && bet.multiBetLegs.length > 0 && (
+                                  <div className="mt-3 p-3 bg-slate-950/50 rounded-xl border border-slate-700">
+                                    <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Bet Legs</p>
+                                    {bet.multiBetLegs.map((leg, idx) => (
+                                      <div key={idx} className="text-xs text-slate-400 mb-1 last:mb-0 flex justify-between">
+                                        <span>{leg.event} - {leg.selection}</span>
+                                        <span className="text-blue-400">{leg.odds.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <button
                                 onClick={() => handleDeleteBet(bet.id)}
@@ -1303,8 +1790,9 @@
                                   className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white font-bold text-xs focus:outline-none focus:border-blue-500"
                                 >
                                   <option value="single">Single</option>
-                                  <option value="accumulator">Accumulator</option>
+                                  <option value="double">Double</option>
                                   <option value="treble">Treble</option>
+                                  <option value="accumulator">Accumulator</option>
                                 </select>
                               </div>
                             </div>
@@ -1339,8 +1827,8 @@
                   {isLoadingOpportunities ? (
                     <div className="text-center py-20">
                       <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                      <p className="text-slate-400 font-bold">Running multi-factor analysis...</p>
-                      <p className="text-slate-600 text-sm mt-2">Analyzing odds, standings, form & consensus</p>
+                      <p className="text-slate-400 font-bold">Running enhanced multi-factor analysis...</p>
+                      <p className="text-slate-600 text-sm mt-2">Analyzing odds, standings, form, consensus & timing</p>
                     </div>
                   ) : opportunities.length === 0 ? (
                     <div className="text-center py-20 bg-slate-900/40 border-2 border-dashed border-slate-800 rounded-[3rem]">
@@ -1374,7 +1862,7 @@
                 <header className="flex justify-between items-center mb-12">
                   <div>
                     <h2 className="text-3xl font-black text-white tracking-tight mb-2">Real Madrid & Barcelona</h2>
-                    <p className="text-slate-500 font-medium">Multi-factor analysis with market insights</p>
+                    <p className="text-slate-500 font-medium">Enhanced multi-factor analysis with detailed insights</p>
                   </div>
                   <button
                     onClick={fetchLaLigaMatches}
@@ -1403,7 +1891,6 @@
                 ) : (
                   <div className="grid gap-8">
                     {laLigaMatches.map(match => {
-                      // Calculate likely scores based on odds
                       const homeProb = (1 / match.homeOdds) * 100;
                       const awayProb = (1 / match.awayOdds) * 100;
                       const drawProb = (1 / match.drawOdds) * 100;
@@ -1415,35 +1902,15 @@
                       if (homeProb > awayProb && homeProb > drawProb) {
                         outcome = "Home Win";
                         outcomeProb = homeProb;
-                        if (homeProb > 75) {
-                          likelyScore = "3-0";
-                        } else if (homeProb > 65) {
-                          likelyScore = "2-0";
-                        } else if (homeProb > 55) {
-                          likelyScore = "2-1";
-                        } else {
-                          likelyScore = "1-0";
-                        }
+                        likelyScore = homeProb > 75 ? "3-0" : homeProb > 65 ? "2-0" : homeProb > 55 ? "2-1" : "1-0";
                       } else if (awayProb > homeProb && awayProb > drawProb) {
                         outcome = "Away Win";
                         outcomeProb = awayProb;
-                        if (awayProb > 75) {
-                          likelyScore = "0-3";
-                        } else if (awayProb > 65) {
-                          likelyScore = "0-2";
-                        } else if (awayProb > 55) {
-                          likelyScore = "1-2";
-                        } else {
-                          likelyScore = "0-1";
-                        }
+                        likelyScore = awayProb > 75 ? "0-3" : awayProb > 65 ? "0-2" : awayProb > 55 ? "1-2" : "0-1";
                       } else {
                         outcome = "Draw";
                         outcomeProb = drawProb;
-                        if (homeProb > 40 && awayProb > 40) {
-                          likelyScore = "2-2";
-                        } else {
-                          likelyScore = "1-1";
-                        }
+                        likelyScore = homeProb > 40 && awayProb > 40 ? "2-2" : "1-1";
                       }
 
                       return (
@@ -1463,12 +1930,24 @@
                             </span>
                           </div>
                           
+                          {match.insights && match.insights.length > 0 && (
+                            <div className="mb-6 p-4 bg-blue-500/10 rounded-xl border-2 border-blue-500/20">
+                              <p className="text-[10px] text-blue-400 font-black uppercase mb-2 flex items-center gap-2">
+                                <Target size={12} />
+                                MATCH INSIGHTS
+                              </p>
+                              {match.insights.map((insight, idx) => (
+                                <p key={idx} className="text-xs text-slate-300 mb-1 last:mb-0">• {insight}</p>
+                              ))}
+                            </div>
+                          )}
+                          
                           <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30 rounded-2xl p-6 mb-6">
                             <div className="flex items-center gap-3 mb-4">
                               <div className="bg-blue-500 p-2 rounded-lg">
                                 <TrendingUp size={20} className="text-white" />
                               </div>
-                              <h4 className="text-lg font-black text-white">BOOKMAKER PREDICTION</h4>
+                              <h4 className="text-lg font-black text-white">PREDICTION</h4>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -1508,12 +1987,22 @@
 
                           {match.reasoning && (
                             <div className="bg-slate-950/50 rounded-2xl p-6 mb-6 border-2 border-slate-700">
-                              <p className="text-xs text-slate-500 uppercase font-black mb-2">Analysis</p>
+                              <p className="text-xs text-slate-500 uppercase font-black mb-2">Detailed Analysis</p>
                               <p className="text-sm text-slate-300 leading-relaxed">{match.reasoning}</p>
                             </div>
                           )}
 
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-3">
+                            <button
+                              onClick={() => toggleBetSelection(match)}
+                              className={`p-3 rounded-xl transition-all ${
+                                selectedBets.some(b => b.id === match.id)
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-slate-800 text-slate-400 hover:bg-purple-600/20'
+                              }`}
+                            >
+                              {selectedBets.some(b => b.id === match.id) ? <Check size={16} /> : <Plus size={16} />}
+                            </button>
                             <button
                               onClick={() => handlePlaceBet(match, null, 'single')}
                               disabled={currentBankroll < userStakeInput}
@@ -1561,8 +2050,9 @@
                                 </span>
                                 <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${
                                   bet.betType === 'single' ? 'bg-blue-500/20 text-blue-400' :
-                                  bet.betType === 'accumulator' ? 'bg-purple-500/20 text-purple-400' :
-                                  'bg-amber-500/20 text-amber-400'
+                                  bet.betType === 'double' ? 'bg-purple-500/20 text-purple-400' :
+                                  bet.betType === 'treble' ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-red-500/20 text-red-400'
                                 }`}>
                                   {bet.betType}
                                 </span>
@@ -1572,14 +2062,28 @@
                               </div>
                               <h4 className="text-lg font-bold text-white mb-1">{bet.event}</h4>
                               <p className="text-xs text-blue-400 font-bold mb-3">{bet.league} • {bet.selection}</p>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                              
+                              {/* Show multi-bet legs if applicable */}
+                              {bet.multiBetLegs && bet.multiBetLegs.length > 0 && (
+                                <div className="mt-3 p-3 bg-slate-950/50 rounded-xl border border-slate-700">
+                                  <p className="text-[10px] text-slate-500 font-black uppercase mb-2">Bet Legs</p>
+                                  {bet.multiBetLegs.map((leg, idx) => (
+                                    <div key={idx} className="text-xs text-slate-400 mb-1 last:mb-0 flex justify-between">
+                                      <span>{leg.event} - {leg.selection}</span>
+                                      <span className="text-blue-400">{leg.odds.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mt-3">
                                 <div>
                                   <p className="text-slate-500 uppercase text-[10px] mb-1">Stake</p>
                                   <p className="text-white font-bold">£{bet.stake.toFixed(2)}</p>
                                 </div>
                                 <div>
                                   <p className="text-slate-500 uppercase text-[10px] mb-1">Odds</p>
-                                  <p className="text-white font-bold">{bet.odds}</p>
+                                  <p className="text-white font-bold">{bet.odds.toFixed(2)}</p>
                                 </div>
                                 <div>
                                   <p className="text-slate-500 uppercase text-[10px] mb-1">Return</p>
