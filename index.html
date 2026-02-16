@@ -227,12 +227,23 @@
       const [showBetSlip, setShowBetSlip] = useState(false);
       const [accumulatorStake, setAccumulatorStake] = useState('');
 
-      // API Configuration
+      // API Configuration - Multiple keys with auto-fallback
       const API_KEYS = {
-        primary: "0d7491630a8624fe87ea1da0dad2ea3f",  // Get from https://the-odds-api.com
-        backup: "64a74abb6980d161caf1ab8ff856dea9",  // Backup key - auto-fallback if primary fails
-        footballData: "ad3bee407db9f5221c7965ef2055f174"
+        odds: [
+          "0d7491630a8624fe87ea1da0dad2ea3f",  // Primary odds key
+          "64a74abb6980d161caf1ab8ff856dea9",  // Backup odds key #1
+          "0d7491630a8624fe87ea1da0dad2ea3f"   // Backup odds key #2
+        ],
+        footballData: [
+          "ad3bee407db9f5221c7965ef2055f174",  // Primary football-data key
+          "ad3bee407db9f5221c7965ef2055f174",  // Backup football-data key #1
+          "841d20ea136048e89f03bdb48eda42f3"   // Backup football-data key #2
+        ]
       };
+
+      // Track which key index we're currently using
+      let currentOddsKeyIndex = 0;
+      let currentFootballDataKeyIndex = 0;
 
       // League Configuration
       const LEAGUES = {
@@ -285,7 +296,7 @@
       // API FETCHERS
       // ============================================================================
 
-      const fetchDirectOdds = async (sport, apiKey, useCache = true) => {
+      const fetchDirectOdds = async (sport, useCache = true) => {
         if (useCache) {
           const cached = cache.get(`odds_${sport}`);
           if (cached) {
@@ -294,27 +305,35 @@
           }
         }
 
-        const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=uk&markets=h2h&oddsFormat=decimal`;
-        
-        try {
-          const response = await fetch(url);
-          setApiUsage(prev => ({ ...prev, oddsAPI: prev.oddsAPI + 1 }));
+        // Try all available API keys
+        for (let keyIndex = 0; keyIndex < API_KEYS.odds.length; keyIndex++) {
+          const apiKey = API_KEYS.odds[keyIndex];
+          const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${apiKey}&regions=uk&markets=h2h&oddsFormat=decimal`;
           
-          if (response.ok) {
-            const data = await response.json();
-            cache.set(`odds_${sport}`, data, 10);
-            return data;
-          } else if (response.status === 429) {
-            console.log('Rate limit hit');
-            return null;
-          } else {
-            console.error(`API error for ${sport}: ${response.status}`);
-            return [];
+          try {
+            const response = await fetch(url);
+            setApiUsage(prev => ({ ...prev, oddsAPI: prev.oddsAPI + 1 }));
+            
+            if (response.ok) {
+              const data = await response.json();
+              cache.set(`odds_${sport}`, data, 10);
+              console.log(`✓ Fetched ${sport} using odds key #${keyIndex + 1}`);
+              return data;
+            } else if (response.status === 429 || response.status === 401) {
+              console.log(`Key #${keyIndex + 1} failed (${response.status}), trying next key...`);
+              continue; // Try next key
+            } else {
+              console.error(`API error for ${sport}: ${response.status}`);
+              return [];
+            }
+          } catch (err) {
+            console.error(`Fetch error for ${sport}:`, err);
+            continue; // Try next key
           }
-        } catch (err) {
-          console.error(`Fetch error for ${sport}:`, err);
-          return [];
         }
+        
+        console.error(`All odds API keys exhausted for ${sport}`);
+        return [];
       };
 
       const fetchStandings = async (leagueId) => {
@@ -767,36 +786,83 @@
         const windowStart = new Date(now.getTime() - (12 * 60 * 60 * 1000));
         const windowEnd = new Date(now.getTime() + (2 * 24 * 60 * 60 * 1000));
 
-        const allLeagues = [...LEAGUES.uk, ...LEAGUES.europe];
+        // Prioritize leagues most likely to have matches
+        const priorityLeagues = [
+          { key: 'soccer_epl', name: 'Premier League', fdId: 2021 },
+          { key: 'soccer_efl_champ', name: 'Championship', fdId: 2016 },
+          { key: 'soccer_spain_la_liga', name: 'La Liga', fdId: 2014 },
+          { key: 'soccer_germany_bundesliga', name: 'Bundesliga', fdId: 2002 },
+          { key: 'soccer_italy_serie_a', name: 'Serie A', fdId: 2019 },
+          { key: 'soccer_france_ligue_one', name: 'Ligue 1', fdId: 2015 }
+        ];
 
-        console.log('📊 Fetching standings...');
-        const standingsMap = {};
+        const secondaryLeagues = [
+          { key: 'soccer_portugal_primeira_liga', name: 'Primeira Liga', fdId: 2017 },
+          { key: 'soccer_turkey_super_league', name: 'Süper Lig', fdId: 2070 }
+        ];
 
-        console.log(`✓ Loaded standings for ${Object.keys(standingsMap).length} leagues`);
-
-        console.log('💰 Fetching odds...');
-        for (const league of allLeagues) {
+        console.log('💰 Fetching odds from priority leagues...');
+        
+        let successfulFetches = 0;
+        let apiCallsMade = 0;
+        
+        // Try priority leagues first
+        for (const league of priorityLeagues) {
+          if (apiCallsMade >= 6) break; // Limit API calls to avoid rate limits
+          
           try {
-            let events = await fetchDirectOdds(league.key, API_KEYS.primary, true);
-            
-            if (events === null) {
-              events = await fetchDirectOdds(league.key, API_KEYS.backup, true);
-            }
+            let events = await fetchDirectOdds(league.key, true);
+            apiCallsMade++;
 
             if (events && events.length > 0) {
+              successfulFetches++;
               events.forEach(event => {
                 const eventTime = new Date(event.commence_time);
                 
                 if (eventTime >= windowStart && eventTime <= windowEnd) {
-                  const analysis = analyzeMatch(event, league.name, standingsMap[league.key]);
+                  const analysis = analyzeMatch(event, league.name, null);
                   if (analysis) {
                     allRecommendations.push(analysis);
                   }
                 }
               });
             }
+            
+            // If we got good data from 3 leagues, that's enough
+            if (successfulFetches >= 3 && allRecommendations.length >= 10) {
+              console.log(`✅ Got ${allRecommendations.length} matches from ${successfulFetches} leagues, stopping early`);
+              break;
+            }
           } catch (err) {
             console.error(`Error fetching ${league.name}:`, err);
+          }
+        }
+        
+        // Only try secondary leagues if we didn't get enough data
+        if (allRecommendations.length < 5 && apiCallsMade < 8) {
+          console.log('Trying secondary leagues...');
+          for (const league of secondaryLeagues) {
+            if (apiCallsMade >= 8) break;
+            
+            try {
+              let events = await fetchDirectOdds(league.key, true);
+              apiCallsMade++;
+
+              if (events && events.length > 0) {
+                events.forEach(event => {
+                  const eventTime = new Date(event.commence_time);
+                  
+                  if (eventTime >= windowStart && eventTime <= windowEnd) {
+                    const analysis = analyzeMatch(event, league.name, null);
+                    if (analysis) {
+                      allRecommendations.push(analysis);
+                    }
+                  }
+                });
+              }
+            } catch (err) {
+              console.error(`Error fetching ${league.name}:`, err);
+            }
           }
         }
 
@@ -806,10 +872,10 @@
         setLastDataFetch(new Date());
         setIsLoadingOpportunities(false);
 
-        console.log(`✅ Total: ${allRecommendations.length} matches analyzed`);
+        console.log(`✅ Total: ${allRecommendations.length} matches analyzed from ${apiCallsMade} API calls`);
 
         if (allRecommendations.length === 0) {
-          setOppsError('No matches found in the next 2 days.');
+          setOppsError('No matches found in the next 2 days. Your API keys may be rate limited.');
         }
       };
 
@@ -817,13 +883,8 @@
         setIsLoadingLaLiga(true);
         
         try {
-          let events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.primary, true);
-          
-          if (events === null) {
-            events = await fetchDirectOdds('soccer_spain_la_liga', API_KEYS.backup, true);
-          }
+          let events = await fetchDirectOdds('soccer_spain_la_liga', true);
 
-          const standings = await fetchStandings(2014);
           const rmBarcaMatches = [];
 
           if (events && events.length > 0) {
@@ -835,7 +896,7 @@
               const isBarca = homeLower.includes('barcelona') || awayLower.includes('barcelona');
 
               if (isRM || isBarca) {
-                const analysis = analyzeMatch(event, 'La Liga', standings);
+                const analysis = analyzeMatch(event, 'La Liga', null);
                 
                 if (analysis) {
                   rmBarcaMatches.push({
